@@ -38,8 +38,61 @@
 #include <EGL/egl.h>
 #include <GLES2/gl2.h>
 #include <zlib.h>
+#include <setjmp.h>
 #include "so_util.h"
 #include "util.h"
+
+/* EGL globals from main.c */
+extern EGLDisplay g_egl_display;
+extern EGLSurface g_egl_surface;
+extern EGLContext g_egl_context;
+extern int g_screen_w, g_screen_h;
+
+/* Hooked EGL functions - return our pre-created context */
+static EGLDisplay hook_eglGetDisplay(EGLNativeDisplayType d) { return g_egl_display; }
+static EGLBoolean hook_eglInitialize(EGLDisplay d, EGLint *maj, EGLint *min) { if(maj)*maj=1; if(min)*min=5; return EGL_TRUE; }
+static EGLint hook_eglGetError(void) { return EGL_SUCCESS; }
+static EGLBoolean hook_eglChooseConfig(EGLDisplay d, const EGLint *a, EGLConfig *c, EGLint cs, EGLint *nc) {
+    if(c && cs>0) { c[0]=(EGLConfig)0x1; } if(nc) *nc=1; return EGL_TRUE;
+}
+static EGLBoolean hook_eglGetConfigAttrib(EGLDisplay d, EGLConfig c, EGLint a, EGLint *v) {
+    if(!v) return EGL_FALSE;
+    switch(a) { case EGL_RED_SIZE: case EGL_GREEN_SIZE: case EGL_BLUE_SIZE: *v=8; break; case EGL_ALPHA_SIZE: *v=0; break; case EGL_DEPTH_SIZE: *v=16; break; case EGL_STENCIL_SIZE: *v=0; break; case EGL_NATIVE_VISUAL_ID: *v=0; break; default: *v=0; }
+    return EGL_TRUE;
+}
+static EGLSurface hook_eglCreateWindowSurface(EGLDisplay d, EGLConfig c, EGLNativeWindowType w, const EGLint *a) {
+    debugPrintf("hook_eglCreateWindowSurface called\n"); return g_egl_surface;
+}
+static EGLBoolean hook_eglQuerySurface(EGLDisplay d, EGLSurface s, EGLint a, EGLint *v) {
+    if(!v) return EGL_FALSE;
+    if(a==EGL_WIDTH) *v=g_screen_w; else if(a==EGL_HEIGHT) *v=g_screen_h; else *v=0;
+    return EGL_TRUE;
+}
+static EGLContext hook_eglCreateContext(EGLDisplay d, EGLConfig c, EGLContext sh, const EGLint *a) {
+    debugPrintf("hook_eglCreateContext called\n"); return g_egl_context;
+}
+static EGLBoolean hook_eglDestroyContext(EGLDisplay d, EGLContext c) { return EGL_TRUE; }
+static EGLBoolean hook_eglMakeCurrent(EGLDisplay d, EGLSurface dr, EGLSurface rd, EGLContext c) {
+    return eglMakeCurrent(g_egl_display, g_egl_surface, g_egl_surface, g_egl_context);
+}
+static EGLBoolean hook_eglDestroySurface(EGLDisplay d, EGLSurface s) { return EGL_TRUE; }
+static EGLBoolean hook_eglTerminate(EGLDisplay d) { return EGL_TRUE; }
+static EGLBoolean hook_eglSwapBuffers(EGLDisplay d, EGLSurface s) {
+    return eglSwapBuffers(g_egl_display, g_egl_surface);
+}
+static void *hook_eglGetProcAddress(const char *name) { return eglGetProcAddress(name); }
+
+/* ANativeWindow stub */
+static int32_t fake_ANativeWindow_setBuffersGeometry(void *w, int32_t width, int32_t height, int32_t fmt) {
+    debugPrintf("ANativeWindow_setBuffersGeometry: %dx%d fmt=%d\n", width, height, fmt);
+    return 0;
+}
+
+/* OpenSL ES stub */
+static int fake_slCreateEngine(void **eng, unsigned int nopt, void *opts, unsigned int ni, void *ids, void *req) {
+    debugPrintf("slCreateEngine called (stub)\n");
+    return -1; /* SL_RESULT_INTERNAL_ERROR - audio won't work but game won't crash */
+}
 
 /* Android stubs */
 static int32_t fake_AConfig_getInt(void *c) { return 0; }
@@ -400,19 +453,24 @@ DynLibFunction dynlib_functions_extra[] = {
     {"SL_IID_SEEK", (uintptr_t)&SL_IID_SEEK_fake},
     {"SL_IID_PLAY", (uintptr_t)&SL_IID_PLAY_fake},
 
-    /* EGL extras */
-    {"eglInitialize", (uintptr_t)&eglInitialize},
-    {"eglGetError", (uintptr_t)&eglGetError},
-    {"eglChooseConfig", (uintptr_t)&eglChooseConfig},
-    {"eglGetConfigAttrib", (uintptr_t)&eglGetConfigAttrib},
-    {"eglCreateWindowSurface", (uintptr_t)&eglCreateWindowSurface},
-    {"eglQuerySurface", (uintptr_t)&eglQuerySurface},
-    {"eglCreateContext", (uintptr_t)&eglCreateContext},
-    {"eglDestroyContext", (uintptr_t)&eglDestroyContext},
-    {"eglMakeCurrent", (uintptr_t)&eglMakeCurrent},
-    {"eglDestroySurface", (uintptr_t)&eglDestroySurface},
-    {"eglTerminate", (uintptr_t)&eglTerminate},
-    {"eglSwapBuffers", (uintptr_t)&eglSwapBuffers},
+    /* EGL hooks - return our pre-created context */
+    {"eglGetDisplay", (uintptr_t)&hook_eglGetDisplay},
+    {"eglInitialize", (uintptr_t)&hook_eglInitialize},
+    {"eglGetError", (uintptr_t)&hook_eglGetError},
+    {"eglChooseConfig", (uintptr_t)&hook_eglChooseConfig},
+    {"eglGetConfigAttrib", (uintptr_t)&hook_eglGetConfigAttrib},
+    {"eglCreateWindowSurface", (uintptr_t)&hook_eglCreateWindowSurface},
+    {"eglQuerySurface", (uintptr_t)&hook_eglQuerySurface},
+    {"eglCreateContext", (uintptr_t)&hook_eglCreateContext},
+    {"eglDestroyContext", (uintptr_t)&hook_eglDestroyContext},
+    {"eglMakeCurrent", (uintptr_t)&hook_eglMakeCurrent},
+    {"eglDestroySurface", (uintptr_t)&hook_eglDestroySurface},
+    {"eglTerminate", (uintptr_t)&hook_eglTerminate},
+    {"eglSwapBuffers", (uintptr_t)&hook_eglSwapBuffers},
+    {"eglGetProcAddress", (uintptr_t)&hook_eglGetProcAddress},
+
+    /* ANativeWindow */
+    {"ANativeWindow_setBuffersGeometry", (uintptr_t)&fake_ANativeWindow_setBuffersGeometry},
 
     /* GL extras */
     {"glIsTexture", (uintptr_t)&glIsTexture},
@@ -420,9 +478,17 @@ DynLibFunction dynlib_functions_extra[] = {
     {"glIsRenderbuffer", (uintptr_t)&glIsRenderbuffer},
     {"glValidateProgram", (uintptr_t)&glValidateProgram},
 
+    /* setjmp/longjmp */
+    {"setjmp", (uintptr_t)&setjmp},
+    {"longjmp", (uintptr_t)&longjmp},
+
+    /* OpenSL ES */
+    {"slCreateEngine", (uintptr_t)&fake_slCreateEngine},
+
     /* zlib extras */
     {"inflateInit_", (uintptr_t)&inflateInit_},
     {"inflateReset", (uintptr_t)&inflateReset},
+    {"inflateReset2", (uintptr_t)&inflateReset2},
     {"deflateReset", (uintptr_t)&deflateReset},
 };
 
