@@ -2,12 +2,11 @@
  * main.c -- Alien Shooter ARM64 Linux loader
  *
  * Loads libalien_shooter.so and simulates ANativeActivity environment.
- * Based on Max Payne ARM64 port structure.
+ * Game manages its own EGL/GL context. We only provide SDL window + lifecycle.
  */
 
 #include <SDL2/SDL.h>
-#include <EGL/egl.h>
-#include <GLES2/gl2.h>
+#include <SDL2/SDL_syswm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,7 +58,7 @@ struct ANativeActivity {
     const char *obbPath;
 };
 
-/* Fake JNI environment setup */
+/* Fake JNI */
 static jint fake_GetVersion(JNIEnv *env) { return JNI_VERSION_1_6; }
 static jclass fake_FindClass(JNIEnv *env, const char *name) {
     debugPrintf("JNI FindClass: %s\n", name);
@@ -70,15 +69,12 @@ static jmethodID fake_GetMethodID(JNIEnv *env, jclass cls, const char *name, con
     return (jmethodID)0x42424242;
 }
 static jmethodID fake_GetStaticMethodID(JNIEnv *env, jclass cls, const char *name, const char *sig) {
-    debugPrintf("JNI GetStaticMethodID: %s %s\n", name, sig);
     return (jmethodID)0x43434343;
 }
 static jfieldID fake_GetFieldID(JNIEnv *env, jclass cls, const char *name, const char *sig) {
-    debugPrintf("JNI GetFieldID: %s %s\n", name, sig);
     return (jfieldID)0x44444444;
 }
 static jstring fake_NewStringUTF(JNIEnv *env, const char *str) {
-    debugPrintf("JNI NewStringUTF: %s\n", str ? str : "(null)");
     return (jstring)(uintptr_t)str;
 }
 static const char *fake_GetStringUTFChars(JNIEnv *env, jstring str, jboolean *isCopy) {
@@ -126,86 +122,31 @@ static void jni_init(void) {
     jvm = &jvm_functions;
 }
 
-/* SDL + EGL globals */
 static SDL_Window *sdl_window = NULL;
-static EGLDisplay egl_display = EGL_NO_DISPLAY;
-static EGLSurface egl_surface = EGL_NO_SURFACE;
-static EGLContext egl_context = EGL_NO_CONTEXT;
-
-static int init_graphics(void) {
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
-        debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    sdl_window = SDL_CreateWindow("Alien Shooter",
-        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
-        640, 480,
-        SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
-
-    if (!sdl_window) {
-        debugPrintf("SDL_CreateWindow failed: %s\n", SDL_GetError());
-        return -1;
-    }
-
-    egl_display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
-    if (egl_display == EGL_NO_DISPLAY) {
-        debugPrintf("eglGetDisplay failed\n");
-        return -1;
-    }
-
-    eglInitialize(egl_display, NULL, NULL);
-
-    EGLint attribs[] = {
-        EGL_RENDERABLE_TYPE, EGL_OPENGL_ES2_BIT,
-        EGL_SURFACE_TYPE, EGL_WINDOW_BIT,
-        EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8,
-        EGL_DEPTH_SIZE, 16,
-        EGL_NONE
-    };
-
-    EGLConfig config;
-    EGLint num_configs;
-    eglChooseConfig(egl_display, attribs, &config, 1, &num_configs);
-
-    EGLint ctx_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-    egl_context = eglCreateContext(egl_display, config, EGL_NO_CONTEXT, ctx_attribs);
-
-    egl_surface = eglCreateWindowSurface(egl_display, config,
-        (EGLNativeWindowType)sdl_window, NULL);
-
-    eglMakeCurrent(egl_display, egl_surface, egl_surface, egl_context);
-
-    debugPrintf("Graphics initialized: GL %s\n", glGetString(GL_VERSION));
-    return 0;
-}
 
 typedef void (*ANativeActivity_createFunc)(ANativeActivity *, void *, size_t);
 
 int main(int argc, char *argv[]) {
     debugPrintf("Alien Shooter for ARM64 Linux\n");
 
-    /* Check game files */
     struct stat st;
     if (stat(SO_NAME, &st) != 0) {
         debugPrintf("ERROR: Cannot find %s\n", SO_NAME);
-        debugPrintf("Make sure you placed the APK files correctly.\n");
         return 1;
     }
     debugPrintf("Found %s (%ld bytes)\n", SO_NAME, st.st_size);
 
-    /* Allocate memory for the .so */
     size_t heap_size = MEMORY_MB * 1024 * 1024;
     void *heap = mmap(NULL, heap_size, PROT_READ | PROT_WRITE,
                       MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (heap == MAP_FAILED) {
-        debugPrintf("Failed to allocate %d MB for .so\n", MEMORY_MB);
+        debugPrintf("Failed to allocate %d MB\n", MEMORY_MB);
         return 1;
     }
 
     debugPrintf("Loading %s...\n", SO_NAME);
     if (so_load(SO_NAME, heap, heap_size) < 0) {
-        debugPrintf("Failed to load %s\n", SO_NAME);
+        debugPrintf("Failed to load .so\n");
         return 1;
     }
     debugPrintf("so_load() passed.\n");
@@ -224,17 +165,24 @@ int main(int argc, char *argv[]) {
     so_execute_init_array();
     debugPrintf("Init arrays executed.\n");
 
-    /* Initialize fake JNI */
     jni_init();
     debugPrintf("jni_init() passed.\n");
 
-    /* Initialize graphics */
-    if (init_graphics() < 0) {
-        debugPrintf("Failed to initialize graphics\n");
+    /* SDL only - game creates its own EGL context */
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
+        debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
         return 1;
     }
 
-    /* Find and call ANativeActivity_onCreate */
+    sdl_window = SDL_CreateWindow("Alien Shooter",
+        SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
+        640, 480, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
+    if (!sdl_window) {
+        debugPrintf("SDL_CreateWindow failed: %s\n", SDL_GetError());
+        return 1;
+    }
+    debugPrintf("SDL initialized, driver: %s\n", SDL_GetCurrentVideoDriver());
+
     ANativeActivity_createFunc onCreate =
         (ANativeActivity_createFunc)so_find_addr("ANativeActivity_onCreate");
     if (!onCreate) {
@@ -256,47 +204,47 @@ int main(int argc, char *argv[]) {
     activity.externalDataPath = "./data";
     activity.sdkVersion = 28;
     activity.assetManager = (void *)0x12345678;
-
     mkdir("data", 0755);
 
     debugPrintf("Calling ANativeActivity_onCreate...\n");
     onCreate(&activity, NULL, 0);
     debugPrintf("ANativeActivity_onCreate returned.\n");
 
-    /* Notify the game that window is ready */
-    if (callbacks.onNativeWindowCreated)
-        callbacks.onNativeWindowCreated(&activity, sdl_window);
-    if (callbacks.onStart)
-        callbacks.onStart(&activity);
-    if (callbacks.onResume)
-        callbacks.onResume(&activity);
-    if (callbacks.onWindowFocusChanged)
-        callbacks.onWindowFocusChanged(&activity, 1);
+    /* Wait for game thread to start its looper */
+    usleep(500000);
 
-    /* Main event loop */
+    debugPrintf("Sending lifecycle events...\n");
+    if (callbacks.onNativeWindowCreated) {
+        callbacks.onNativeWindowCreated(&activity, sdl_window);
+        debugPrintf("  onNativeWindowCreated\n");
+    }
+    usleep(100000);
+    if (callbacks.onStart) {
+        callbacks.onStart(&activity);
+        debugPrintf("  onStart\n");
+    }
+    if (callbacks.onResume) {
+        callbacks.onResume(&activity);
+        debugPrintf("  onResume\n");
+    }
+    if (callbacks.onWindowFocusChanged) {
+        callbacks.onWindowFocusChanged(&activity, 1);
+        debugPrintf("  onWindowFocusChanged\n");
+    }
+
     debugPrintf("Entering main loop...\n");
     SDL_Event event;
     int running = 1;
     while (running) {
         while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_QUIT) {
-                running = 0;
-            }
+            if (event.type == SDL_QUIT) running = 0;
         }
-        eglSwapBuffers(egl_display, egl_surface);
         SDL_Delay(16);
     }
 
-    /* Cleanup */
     if (callbacks.onPause)  callbacks.onPause(&activity);
     if (callbacks.onStop)   callbacks.onStop(&activity);
-
-    eglMakeCurrent(egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
-    eglDestroySurface(egl_display, egl_surface);
-    eglDestroyContext(egl_display, egl_context);
-    eglTerminate(egl_display);
     SDL_DestroyWindow(sdl_window);
     SDL_Quit();
-
     return 0;
 }
