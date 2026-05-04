@@ -153,6 +153,11 @@ int so_relocate(void) {
   return 0;
 }
 
+static void unresolved_stub(void) {
+  printf("FATAL: Called unresolved import!\n");
+  fflush(stdout);
+}
+
 int so_resolve(DynLibFunction *funcs, int num_funcs, int taint_missing_imports) {
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
@@ -164,10 +169,18 @@ int so_resolve(DynLibFunction *funcs, int num_funcs, int taint_missing_imports) 
         if (ELF64_R_TYPE(rels[j].r_info) == R_AARCH64_GLOB_DAT || ELF64_R_TYPE(rels[j].r_info) == R_AARCH64_JUMP_SLOT) {
           if (sym->st_shndx == SHN_UNDEF) {
             char *name = dynstrtab + sym->st_name;
+            int found = 0;
             for (int k = 0; k < num_funcs; k++) {
               if (strcmp(name, funcs[k].symbol) == 0) {
                 *ptr = funcs[k].func;
+                found = 1;
                 break;
+              }
+            }
+            if (!found) {
+              printf("WARNING: unresolved import: %s\n", name);
+              if (taint_missing_imports) {
+                *ptr = (uintptr_t)&unresolved_stub;
               }
             }
           }
