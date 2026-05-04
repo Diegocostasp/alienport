@@ -23,6 +23,7 @@ set(SOURCES
     src/main.c
     src/so_util.c
     src/imports.c
+    src/imports_extra.c
 )
 
 add_executable(${TARGET_NAME} ${SOURCES})
