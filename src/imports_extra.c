@@ -50,10 +50,46 @@ static void fake_AConfig_delete(void *c) { free(c); }
 static void fake_AConfig_fromAM(void *c, void *am) { }
 static void fake_ANativeActivity_finish(void *a) { debugPrintf("ANativeActivity_finish called\n"); }
 
-/* ALooper stubs */
-static void *fake_ALooper_prepare(int opts) { return (void*)0x100004; }
-static int fake_ALooper_addFd(void *l, int fd, int id, int ev, void *cb, void *d) { return 1; }
-static int fake_ALooper_pollOnce(int to, int *ofd, int *oev, void **od) { usleep(16000); return 0; }
+/* ALooper - functional implementation */
+#define MAX_LOOPER_FDS 8
+static struct { int fd; int ident; int events; void *cb; void *data; } looper_fds[MAX_LOOPER_FDS];
+static int looper_fd_count = 0;
+
+static void *fake_ALooper_prepare(int opts) { looper_fd_count = 0; return (void*)0x100004; }
+
+static int fake_ALooper_addFd(void *l, int fd, int ident, int events, void *cb, void *data) {
+    if (looper_fd_count < MAX_LOOPER_FDS) {
+        looper_fds[looper_fd_count].fd = fd;
+        looper_fds[looper_fd_count].ident = ident;
+        looper_fds[looper_fd_count].events = events;
+        looper_fds[looper_fd_count].cb = cb;
+        looper_fds[looper_fd_count].data = data;
+        looper_fd_count++;
+    }
+    return 1;
+}
+
+static int fake_ALooper_pollOnce(int timeout_ms, int *outFd, int *outEvents, void **outData) {
+    if (looper_fd_count == 0) { usleep(16000); return 0; }
+    struct pollfd pfds[MAX_LOOPER_FDS];
+    for (int i = 0; i < looper_fd_count; i++) {
+        pfds[i].fd = looper_fds[i].fd;
+        pfds[i].events = POLLIN;
+        pfds[i].revents = 0;
+    }
+    int ret = poll(pfds, looper_fd_count, timeout_ms);
+    if (ret > 0) {
+        for (int i = 0; i < looper_fd_count; i++) {
+            if (pfds[i].revents & POLLIN) {
+                if (outFd) *outFd = looper_fds[i].fd;
+                if (outEvents) *outEvents = pfds[i].revents;
+                if (outData) *outData = looper_fds[i].data;
+                return looper_fds[i].ident;
+            }
+        }
+    }
+    return 0; /* ALOOPER_POLL_TIMEOUT */
+}
 
 /* AInputQueue stubs */
 static void fake_AIQ_attachLooper(void *q, void *l, int id, void *cb, void *d) { }
