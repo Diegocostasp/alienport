@@ -7,16 +7,14 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install Cross-Compiler
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libsdl2-dev:arm64
-          # We need SDL2 for aarch64. The easiest way is to let CMake find it or bundle headers.
-          # For PortMaster, we often link against a bundled SDL2 or system one.
+          sudo apt-get install -y cmake gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
       
       - name: Configure CMake
         run: |
@@ -26,8 +24,7 @@ jobs:
             -DCMAKE_SYSTEM_NAME=Linux \
             -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
             -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
-            -DARM64=ON
+            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
       
       - name: Build
         run: |
@@ -39,3 +36,4 @@ jobs:
         with:
           name: alienport-binary
           path: build/alienport
+
