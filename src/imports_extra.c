@@ -1,4 +1,5 @@
 /* imports_extra.c -- Additional symbol resolution for Alien Shooter */
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,7 +51,7 @@ static void fake_AConfig_fromAM(void *c, void *am) { }
 static void fake_ANativeActivity_finish(void *a) { debugPrintf("ANativeActivity_finish called\n"); }
 
 /* ALooper stubs */
-static void *fake_ALooper_prepare(int opts) { return (void*)0xL00PE4; }
+static void *fake_ALooper_prepare(int opts) { return (void*)0x100004; }
 static int fake_ALooper_addFd(void *l, int fd, int id, int ev, void *cb, void *d) { return 1; }
 static int fake_ALooper_pollOnce(int to, int *ofd, int *oev, void **od) { usleep(16000); return 0; }
 
@@ -118,6 +119,11 @@ static int pthread_mutex_trylock_fake(pthread_mutex_t **uid) {
 
 /* ctype */
 static size_t __ctype_get_mb_cur_max_fake(void) { return 4; }
+
+/* stubs for unavailable locale functions */
+static long long strtoll_l_fake(const char *s, char **e, int b, locale_t l) { return strtoll(s,e,b); }
+static unsigned long long strtoull_l_fake(const char *s, char **e, int b, locale_t l) { return strtoull(s,e,b); }
+static long double strtold_l_fake(const char *s, char **e, locale_t l) { return strtold(s,e); }
 
 /* Extra import table */
 DynLibFunction dynlib_functions_extra[] = {
@@ -214,9 +220,9 @@ DynLibFunction dynlib_functions_extra[] = {
     {"strxfrm_l", (uintptr_t)&strxfrm_l},
     {"wcscoll_l", (uintptr_t)&wcscoll_l},
     {"wcsxfrm_l", (uintptr_t)&wcsxfrm_l},
-    {"strtoll_l", (uintptr_t)&strtoll_l},
-    {"strtoull_l", (uintptr_t)&strtoull_l},
-    {"strtold_l", (uintptr_t)&strtold_l},
+    {"strtoll_l", (uintptr_t)&strtoll_l_fake},
+    {"strtoull_l", (uintptr_t)&strtoull_l_fake},
+    {"strtold_l", (uintptr_t)&strtold_l_fake},
     {"iswlower_l", (uintptr_t)&iswlower_l},
     {"iswspace_l", (uintptr_t)&iswspace_l},
     {"iswprint_l", (uintptr_t)&iswprint_l},
