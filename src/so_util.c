@@ -177,7 +177,7 @@ int so_resolve(DynLibFunction *funcs, int num_funcs, int taint_missing_imports) 
                 break;
               }
             }
-            if (!found) {
+            if (!found && (*ptr == 0 || *ptr == (uintptr_t)&unresolved_stub)) {
               printf("WARNING: unresolved import: %s\n", name);
               if (taint_missing_imports) {
                 *ptr = (uintptr_t)&unresolved_stub;
