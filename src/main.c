@@ -86,12 +86,23 @@ static jint fake_GetEnv(JavaVM *vm, void **env, jint ver) {
     return JNI_OK;
 }
 
-
 static struct JNIInvokeInterface_ jvm_funcs = {0};
 static JavaVM jvm;
 
+/* Generic stub for any unimplemented JNI function */
+static uintptr_t fake_JNI_stub(void) {
+    debugPrintf("WARNING: Unimplemented JNI function called!\n");
+    return 0;
+}
+
 static void jni_init(void) {
-    memset(&jni_funcs, 0, sizeof(jni_funcs));
+    /* Fill entire struct with the generic stub to prevent NULL pointer calls */
+    void **func_array = (void **)&jni_funcs;
+    size_t num_funcs = sizeof(jni_funcs) / sizeof(void *);
+    for (size_t i = 0; i < num_funcs; i++) {
+        func_array[i] = (void *)fake_JNI_stub;
+    }
+
     jni_funcs.GetVersion = fake_GetVersion;
     jni_funcs.FindClass = fake_FindClass;
     jni_funcs.GetMethodID = fake_GetMethodID;
@@ -106,9 +117,11 @@ static void jni_init(void) {
     jni_funcs.ExceptionCheck = fake_ExceptionCheck;
     jni_funcs.ExceptionClear = fake_ExceptionClear;
     jni_funcs.GetJavaVM = fake_GetJavaVM;
+    
     jvm_funcs.AttachCurrentThread = fake_AttachCurrentThread;
     jvm_funcs.DetachCurrentThread = fake_DetachCurrentThread;
     jvm_funcs.GetEnv = fake_GetEnv;
+    
     jni_env = &jni_funcs;
     jvm = &jvm_funcs;
 }
@@ -144,6 +157,10 @@ static void crash_handler(int sig, siginfo_t *info, void *ucontext) {
         fprintf(stderr, "  PC is OUTSIDE .so (loader/libc code)\n");
 
     if (uc) {
+        uintptr_t lr = uc->uc_mcontext.regs[30];
+        if (lr >= so_start && lr < so_end)
+            fprintf(stderr, "  LR offset:  0x%lx\n", lr - so_start);
+        
         fprintf(stderr, "  Registers:\n");
         fprintf(stderr, "  x0 : %016llx  x1 : %016llx  x2 : %016llx  x3 : %016llx\n",
             uc->uc_mcontext.regs[0], uc->uc_mcontext.regs[1], uc->uc_mcontext.regs[2], uc->uc_mcontext.regs[3]);
