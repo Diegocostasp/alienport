@@ -247,6 +247,23 @@ static void android_set_abort_message_fake(const char *m) { debugPrintf("abort: 
 /* sincos */
 static void sincosf_fake(float x, float *s, float *c) { *s=sinf(x); *c=cosf(x); }
 
+/* dlopen/dlsym */
+static void *dlopen_fake(const char *filename, int flag) {
+    if (filename) debugPrintf("dlopen: %s\n", filename);
+    return (void *)0x12345678; /* Fake handle */
+}
+static void *dlsym_fake(void *handle, const char *symbol) {
+    debugPrintf("dlsym: %s\n", symbol);
+    /* First try SDL_GL_GetProcAddress for GL functions */
+    void *ptr = SDL_GL_GetProcAddress(symbol);
+    if (ptr) return ptr;
+    /* Try searching our own resolved symbols? 
+     * Since we can't easily access the dynlib_functions array here, 
+     * we will fallback to standard dlsym from RTLD_DEFAULT */
+    return dlsym(RTLD_DEFAULT, symbol);
+}
+static int dlclose_fake(void *handle) { return 0; }
+
 /* pthread extras */
 static int pthread_mutex_trylock_fake(pthread_mutex_t **uid) {
     if (!uid || !*uid) return -1;
@@ -495,6 +512,9 @@ DynLibFunction dynlib_functions_extra[] = {
     /* dl */
     {"dlerror", (uintptr_t)&dlerror},
     {"dl_iterate_phdr", (uintptr_t)&dl_iterate_phdr},
+    {"dlopen", (uintptr_t)&dlopen_fake},
+    {"dlsym", (uintptr_t)&dlsym_fake},
+    {"dlclose", (uintptr_t)&dlclose_fake},
 
 
     /* fortified */
