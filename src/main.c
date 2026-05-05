@@ -73,13 +73,21 @@ static void fake_DeleteLocalRef(JNIEnv *e, jobject o) {}
 static jboolean fake_ExceptionCheck(JNIEnv *e) { return 0; }
 static void fake_ExceptionClear(JNIEnv *e) {}
 static jint fake_GetJavaVM(JNIEnv *e, JavaVM **v) { return 0; }
-static jint fake_AttachCurrentThread(JavaVM *v, JNIEnv **e, void *a) { return 0; }
-static jint fake_DetachCurrentThread(JavaVM *v) { return 0; }
-static jint fake_GetEnv(JavaVM *v, void **e, jint ver) { return 0; }
-
-static struct JNINativeInterface_ jni_funcs = {0};
-static struct JNIInvokeInterface_ jvm_funcs = {0};
+static struct JNINativeInterface_ jni_funcs;
 static JNIEnv jni_env;
+
+static jint fake_AttachCurrentThread(JavaVM *vm, JNIEnv **env, void *args) {
+    if (env) *env = &jni_env;
+    return JNI_OK;
+}
+static jint fake_DetachCurrentThread(JavaVM *v) { return JNI_OK; }
+static jint fake_GetEnv(JavaVM *vm, void **env, jint ver) {
+    if (env) *env = &jni_env;
+    return JNI_OK;
+}
+
+
+static struct JNIInvokeInterface_ jvm_funcs = {0};
 static JavaVM jvm;
 
 static void jni_init(void) {
