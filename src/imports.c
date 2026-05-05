@@ -303,10 +303,7 @@ DynLibFunction dynlib_functions[] = {
     {"inflateInit2_", (uintptr_t)&inflateInit2_},
     {"crc32", (uintptr_t)&crc32},
 
-    /* dlopen/dlsym stubs */
-    {"dlopen", (uintptr_t)&ret0},
-    {"dlsym", (uintptr_t)&ret0},
-    {"dlclose", (uintptr_t)&ret0},
+    /* dlopen/dlsym stubs moved to imports_extra.c */
 
     /* EGL - hooks are in imports_extra.c */
     {"eglQueryString", (uintptr_t)&eglQueryString},
