@@ -117,6 +117,7 @@ typedef void (*ANativeActivity_createFunc)(ANativeActivity *, void *, size_t);
 
 #include <signal.h>
 #include <ucontext.h>
+#include <execinfo.h>
 
 extern void *text_base;
 extern size_t text_size;
@@ -138,9 +139,25 @@ static void crash_handler(int sig, siginfo_t *info, void *ucontext) {
     fprintf(stderr, "  Fault addr: %p\n", info ? info->si_addr : NULL);
     fprintf(stderr, "  PC:         %p\n", (void*)pc);
     if (pc >= so_start && pc < so_end)
-        fprintf(stderr, "  .so offset: 0x%lx (inside libalien_shooter.so)\n", pc - so_start);
+        fprintf(stderr, "  SO offset:  0x%lx\n", pc - so_start);
     else
         fprintf(stderr, "  PC is OUTSIDE .so (loader/libc code)\n");
+
+    if (uc) {
+        fprintf(stderr, "  Registers:\n");
+        fprintf(stderr, "  x0 : %016llx  x1 : %016llx  x2 : %016llx  x3 : %016llx\n",
+            uc->uc_mcontext.regs[0], uc->uc_mcontext.regs[1], uc->uc_mcontext.regs[2], uc->uc_mcontext.regs[3]);
+        fprintf(stderr, "  x4 : %016llx  x5 : %016llx  x6 : %016llx  x7 : %016llx\n",
+            uc->uc_mcontext.regs[4], uc->uc_mcontext.regs[5], uc->uc_mcontext.regs[6], uc->uc_mcontext.regs[7]);
+        fprintf(stderr, "  x8 : %016llx  x29: %016llx  x30: %016llx  sp : %016llx\n",
+            uc->uc_mcontext.regs[8], uc->uc_mcontext.regs[29], uc->uc_mcontext.regs[30], uc->uc_mcontext.sp);
+    }
+
+    void *bt[32];
+    int bt_size = backtrace(bt, 32);
+    fprintf(stderr, "\n  Backtrace:\n");
+    backtrace_symbols_fd(bt, bt_size, fileno(stderr));
+
     fflush(stderr);
 
     FILE *f = fopen("crash.txt", "w");
