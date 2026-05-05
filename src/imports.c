@@ -308,9 +308,7 @@ DynLibFunction dynlib_functions[] = {
     {"dlsym", (uintptr_t)&ret0},
     {"dlclose", (uintptr_t)&ret0},
 
-    /* EGL */
-    {"eglGetDisplay", (uintptr_t)&eglGetDisplay},
-    {"eglGetProcAddress", (uintptr_t)&eglGetProcAddress},
+    /* EGL - hooks are in imports_extra.c */
     {"eglQueryString", (uintptr_t)&eglQueryString},
 
     /* OpenGL ES 2.0 */
