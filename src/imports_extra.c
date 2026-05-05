@@ -253,6 +253,59 @@ static int pthread_mutex_trylock_fake(pthread_mutex_t **uid) {
     return pthread_mutex_trylock(*uid);
 }
 
+/* pthread_attr wrappers - Bionic attr is 8 bytes, glibc is 64 bytes
+ * We heap-allocate to avoid stack corruption */
+static int pthread_attr_init_fake(void **uid) {
+    pthread_attr_t *a = calloc(1, sizeof(pthread_attr_t));
+    if (!a) return -1;
+    int ret = pthread_attr_init(a);
+    if (ret != 0) { free(a); return ret; }
+    *uid = a;
+    return 0;
+}
+static int pthread_attr_setdetachstate_fake(void **uid, int state) {
+    if (!uid || !*uid) return -1;
+    return pthread_attr_setdetachstate((pthread_attr_t*)*uid, state);
+}
+static int pthread_attr_destroy_fake(void **uid) {
+    if (uid && *uid) {
+        pthread_attr_destroy((pthread_attr_t*)*uid);
+        free(*uid);
+        *uid = NULL;
+    }
+    return 0;
+}
+
+/* pthread_rwlock wrappers - same struct size mismatch issue */
+static int pthread_rwlock_init_fake(pthread_rwlock_t **uid, const void *attr) {
+    pthread_rwlock_t *rw = calloc(1, sizeof(pthread_rwlock_t));
+    if (!rw) return -1;
+    int ret = pthread_rwlock_init(rw, NULL);
+    if (ret != 0) { free(rw); return ret; }
+    *uid = rw;
+    return 0;
+}
+static int pthread_rwlock_rdlock_fake(pthread_rwlock_t **uid) {
+    if (!uid || !*uid) return -1;
+    return pthread_rwlock_rdlock(*uid);
+}
+static int pthread_rwlock_wrlock_fake(pthread_rwlock_t **uid) {
+    if (!uid || !*uid) return -1;
+    return pthread_rwlock_wrlock(*uid);
+}
+static int pthread_rwlock_unlock_fake(pthread_rwlock_t **uid) {
+    if (!uid || !*uid) return -1;
+    return pthread_rwlock_unlock(*uid);
+}
+static int pthread_rwlock_destroy_fake(pthread_rwlock_t **uid) {
+    if (uid && *uid) {
+        pthread_rwlock_destroy(*uid);
+        free(*uid);
+        *uid = NULL;
+    }
+    return 0;
+}
+
 /* ctype */
 static size_t __ctype_get_mb_cur_max_fake(void) { return 4; }
 
@@ -372,18 +425,18 @@ DynLibFunction dynlib_functions_extra[] = {
     {"towlower_l", (uintptr_t)&towlower_l},
 
     /* pthread extras */
-    {"pthread_attr_init", (uintptr_t)&pthread_attr_init},
-    {"pthread_attr_setdetachstate", (uintptr_t)&pthread_attr_setdetachstate},
-    {"pthread_attr_destroy", (uintptr_t)&pthread_attr_destroy},
+    {"pthread_attr_init", (uintptr_t)&pthread_attr_init_fake},
+    {"pthread_attr_setdetachstate", (uintptr_t)&pthread_attr_setdetachstate_fake},
+    {"pthread_attr_destroy", (uintptr_t)&pthread_attr_destroy_fake},
     {"pthread_exit", (uintptr_t)&pthread_exit},
     {"pthread_detach", (uintptr_t)&pthread_detach},
     {"pthread_equal", (uintptr_t)&pthread_equal},
     {"pthread_mutex_trylock", (uintptr_t)&pthread_mutex_trylock_fake},
-    {"pthread_rwlock_init", (uintptr_t)&pthread_rwlock_init},
-    {"pthread_rwlock_rdlock", (uintptr_t)&pthread_rwlock_rdlock},
-    {"pthread_rwlock_wrlock", (uintptr_t)&pthread_rwlock_wrlock},
-    {"pthread_rwlock_unlock", (uintptr_t)&pthread_rwlock_unlock},
-    {"pthread_rwlock_destroy", (uintptr_t)&pthread_rwlock_destroy},
+    {"pthread_rwlock_init", (uintptr_t)&pthread_rwlock_init_fake},
+    {"pthread_rwlock_rdlock", (uintptr_t)&pthread_rwlock_rdlock_fake},
+    {"pthread_rwlock_wrlock", (uintptr_t)&pthread_rwlock_wrlock_fake},
+    {"pthread_rwlock_unlock", (uintptr_t)&pthread_rwlock_unlock_fake},
+    {"pthread_rwlock_destroy", (uintptr_t)&pthread_rwlock_destroy_fake},
 
     /* networking */
     {"socket", (uintptr_t)&socket},
