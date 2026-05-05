@@ -116,26 +116,54 @@ static void jni_init(void) {
 typedef void (*ANativeActivity_createFunc)(ANativeActivity *, void *, size_t);
 
 #include <signal.h>
-static void crash_handler(int sig) {
+#include <ucontext.h>
+
+extern void *text_base;
+extern size_t text_size;
+extern size_t data_size;
+
+static void crash_handler(int sig, siginfo_t *info, void *ucontext) {
     const char *name = "UNKNOWN";
     if (sig == SIGSEGV) name = "SIGSEGV";
     else if (sig == SIGBUS) name = "SIGBUS";
     else if (sig == SIGABRT) name = "SIGABRT";
     else if (sig == SIGFPE) name = "SIGFPE";
+
+    ucontext_t *uc = (ucontext_t *)ucontext;
+    uintptr_t pc = uc ? uc->uc_mcontext.pc : 0;
+    uintptr_t so_start = (uintptr_t)text_base;
+    uintptr_t so_end = so_start + text_size + data_size;
+
     fprintf(stderr, "\n*** CRASH: %s (signal %d) ***\n", name, sig);
+    fprintf(stderr, "  Fault addr: %p\n", info ? info->si_addr : NULL);
+    fprintf(stderr, "  PC:         %p\n", (void*)pc);
+    if (pc >= so_start && pc < so_end)
+        fprintf(stderr, "  .so offset: 0x%lx (inside libalien_shooter.so)\n", pc - so_start);
+    else
+        fprintf(stderr, "  PC is OUTSIDE .so (loader/libc code)\n");
     fflush(stderr);
-    /* Write to log file directly */
+
     FILE *f = fopen("crash.txt", "w");
-    if (f) { fprintf(f, "CRASH: %s (signal %d)\n", name, sig); fclose(f); }
+    if (f) {
+        fprintf(f, "CRASH: %s (signal %d)\nFault: %p\nPC: %p\n",
+                name, sig, info ? info->si_addr : NULL, (void*)pc);
+        if (pc >= so_start && pc < so_end)
+            fprintf(f, "SO offset: 0x%lx\n", pc - so_start);
+        fclose(f);
+    }
     _exit(1);
 }
 
 int main(int argc, char *argv[]) {
-    /* Install crash handlers */
-    signal(SIGSEGV, crash_handler);
-    signal(SIGBUS, crash_handler);
-    signal(SIGABRT, crash_handler);
-    signal(SIGFPE, crash_handler);
+    /* Install crash handlers with SA_SIGINFO for detailed info */
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = crash_handler;
+    sa.sa_flags = SA_SIGINFO;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
+    sigaction(SIGFPE, &sa, NULL);
 
     debugPrintf("Alien Shooter for ARM64 Linux\n");
 
