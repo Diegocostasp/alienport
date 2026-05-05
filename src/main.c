@@ -216,6 +216,9 @@ int main(int argc, char *argv[]) {
     jni_init();
     debugPrintf("jni_init() passed.\n");
 
+    /* Disable SDL's signal handlers so our crash handler gets the real PC and fault addr */
+    SDL_SetHint(SDL_HINT_NO_SIGNAL_HANDLERS, "1");
+
     /* Create SDL window + GL context */
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_GAMECONTROLLER) < 0) {
         debugPrintf("SDL_Init failed: %s\n", SDL_GetError());
