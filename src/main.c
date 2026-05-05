@@ -89,18 +89,14 @@ static jint fake_GetEnv(JavaVM *vm, void **env, jint ver) {
 static struct JNIInvokeInterface_ jvm_funcs = {0};
 static JavaVM jvm;
 
-/* Generic stub for any unimplemented JNI function */
-static uintptr_t fake_JNI_stub(void) {
-    debugPrintf("WARNING: Unimplemented JNI function called!\n");
-    return 0;
-}
+#include "jni_stubs.h"
 
 static void jni_init(void) {
     /* Fill entire struct with the generic stub to prevent NULL pointer calls */
     void **func_array = (void **)&jni_funcs;
     size_t num_funcs = sizeof(jni_funcs) / sizeof(void *);
     for (size_t i = 0; i < num_funcs; i++) {
-        func_array[i] = (void *)fake_JNI_stub;
+        func_array[i] = fake_jni_stub_array[i];
     }
 
     jni_funcs.GetVersion = fake_GetVersion;
