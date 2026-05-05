@@ -47,9 +47,16 @@ extern EGLDisplay g_egl_display;
 extern EGLSurface g_egl_surface;
 extern EGLContext g_egl_context;
 extern int g_screen_w, g_screen_h;
+extern SDL_Window *g_sdl_window;
+extern SDL_GLContext g_sdl_glctx;
 
-/* Hooked EGL functions - return our pre-created context */
-static EGLDisplay hook_eglGetDisplay(EGLNativeDisplayType d) { return g_egl_display; }
+/* Fake EGL handles - game thinks these are real */
+static EGLDisplay fake_display = (EGLDisplay)0xE6D1;
+static EGLSurface fake_surface = (EGLSurface)0xE6D2;
+static EGLContext fake_context = (EGLContext)0xE6D3;
+
+/* Hooked EGL functions - redirect to SDL */
+static EGLDisplay hook_eglGetDisplay(EGLNativeDisplayType d) { return fake_display; }
 static EGLBoolean hook_eglInitialize(EGLDisplay d, EGLint *maj, EGLint *min) { if(maj)*maj=1; if(min)*min=5; return EGL_TRUE; }
 static EGLint hook_eglGetError(void) { return EGL_SUCCESS; }
 static EGLBoolean hook_eglChooseConfig(EGLDisplay d, const EGLint *a, EGLConfig *c, EGLint cs, EGLint *nc) {
@@ -61,7 +68,7 @@ static EGLBoolean hook_eglGetConfigAttrib(EGLDisplay d, EGLConfig c, EGLint a, E
     return EGL_TRUE;
 }
 static EGLSurface hook_eglCreateWindowSurface(EGLDisplay d, EGLConfig c, EGLNativeWindowType w, const EGLint *a) {
-    debugPrintf("hook_eglCreateWindowSurface called\n"); return g_egl_surface;
+    debugPrintf("hook_eglCreateWindowSurface called\n"); return fake_surface;
 }
 static EGLBoolean hook_eglQuerySurface(EGLDisplay d, EGLSurface s, EGLint a, EGLint *v) {
     if(!v) return EGL_FALSE;
@@ -69,18 +76,20 @@ static EGLBoolean hook_eglQuerySurface(EGLDisplay d, EGLSurface s, EGLint a, EGL
     return EGL_TRUE;
 }
 static EGLContext hook_eglCreateContext(EGLDisplay d, EGLConfig c, EGLContext sh, const EGLint *a) {
-    debugPrintf("hook_eglCreateContext called\n"); return g_egl_context;
+    debugPrintf("hook_eglCreateContext called\n"); return fake_context;
 }
 static EGLBoolean hook_eglDestroyContext(EGLDisplay d, EGLContext c) { return EGL_TRUE; }
 static EGLBoolean hook_eglMakeCurrent(EGLDisplay d, EGLSurface dr, EGLSurface rd, EGLContext c) {
-    return eglMakeCurrent(g_egl_display, g_egl_surface, g_egl_surface, g_egl_context);
+    SDL_GL_MakeCurrent(g_sdl_window, g_sdl_glctx);
+    return EGL_TRUE;
 }
 static EGLBoolean hook_eglDestroySurface(EGLDisplay d, EGLSurface s) { return EGL_TRUE; }
 static EGLBoolean hook_eglTerminate(EGLDisplay d) { return EGL_TRUE; }
 static EGLBoolean hook_eglSwapBuffers(EGLDisplay d, EGLSurface s) {
-    return eglSwapBuffers(g_egl_display, g_egl_surface);
+    SDL_GL_SwapWindow(g_sdl_window);
+    return EGL_TRUE;
 }
-static void *hook_eglGetProcAddress(const char *name) { return eglGetProcAddress(name); }
+static void *hook_eglGetProcAddress(const char *name) { return SDL_GL_GetProcAddress(name); }
 
 /* ANativeWindow stub */
 static int32_t fake_ANativeWindow_setBuffersGeometry(void *w, int32_t width, int32_t height, int32_t fmt) {
