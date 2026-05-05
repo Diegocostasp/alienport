@@ -172,15 +172,10 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    /* Grab the EGL handles SDL created internally */
-    g_egl_display = eglGetCurrentDisplay();
-    g_egl_surface = eglGetCurrentSurface(EGL_DRAW);
-    g_egl_context = eglGetCurrentContext();
-    debugPrintf("EGL: display=%p surface=%p context=%p\n", g_egl_display, g_egl_surface, g_egl_context);
     debugPrintf("GL: %s\n", glGetString(GL_VERSION));
 
-    /* Unbind so the game thread can use it */
-    eglMakeCurrent(g_egl_display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+    /* Release context from main thread so game thread can grab it via hook_eglMakeCurrent */
+    SDL_GL_MakeCurrent(g_sdl_window, NULL);
 
     ANativeActivity_createFunc onCreate =
         (ANativeActivity_createFunc)so_find_addr("ANativeActivity_onCreate");
