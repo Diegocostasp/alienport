@@ -101,8 +101,45 @@ static int32_t fake_ANativeWindow_setBuffersGeometry(void *w, int32_t width, int
 /* OpenSL ES stub */
 static int fake_slCreateEngine(void **eng, unsigned int nopt, void *opts, unsigned int ni, void *ids, void *req) {
     debugPrintf("slCreateEngine called (stub)\n");
-    return -1; /* SL_RESULT_INTERNAL_ERROR - audio won't work but game won't crash */
+    return -1;
 }
+
+/* C++ ABI stubs */
+static void fake_cxa_finalize(void *d) { }
+static int fake_cxa_atexit(void (*f)(void*), void *a, void *d) { return 0; }
+static int fake_register_atfork(void (*p)(void), void (*pa)(void), void (*c)(void), void *d) { return 0; }
+static void fake_android_set_abort_message(const char *msg) { debugPrintf("abort_message: %s\n", msg ? msg : "null"); }
+
+/* System property stub */
+static int fake_system_property_get(const char *name, char *value) {
+    debugPrintf("__system_property_get: %s\n", name);
+    if (value) value[0] = '\0';
+    return 0;
+}
+
+/* getentropy stub */
+static int fake_getentropy(void *buf, size_t len) {
+    unsigned char *p = buf;
+    for (size_t i = 0; i < len; i++) p[i] = (unsigned char)(rand() & 0xFF);
+    return 0;
+}
+
+/* getauxval stub */
+static unsigned long fake_getauxval(unsigned long type) { return 0; }
+
+/* syslog stubs */
+static void fake_openlog(const char *i, int o, int f) { }
+static void fake_syslog(int p, const char *fmt, ...) { }
+static void fake_closelog(void) { }
+
+/* Signal stubs - prevent game from overwriting our crash handler */
+static int fake_sigaction(int sig, const struct sigaction *act, struct sigaction *oact) {
+    debugPrintf("sigaction(%d) intercepted\n", sig);
+    if (oact) memset(oact, 0, sizeof(*oact));
+    return 0; /* pretend success but don't actually change handlers */
+}
+static int fake_sigemptyset(sigset_t *set) { if(set) memset(set,0,sizeof(*set)); return 0; }
+static int fake_sigaltstack(const void *ss, void *oss) { return 0; }
 
 /* Android stubs */
 static int32_t fake_AConfig_getInt(void *c) { return 0; }
@@ -263,8 +300,7 @@ DynLibFunction dynlib_functions_extra[] = {
     {"getpid", (uintptr_t)&getpid},
     {"geteuid", (uintptr_t)&geteuid},
     {"getpwuid_r", (uintptr_t)&getpwuid_r},
-    {"getauxval", (uintptr_t)&getauxval},
-    {"getentropy", (uintptr_t)&getentropy},
+
     {"sysconf", (uintptr_t)&sysconf},
     {"posix_memalign", (uintptr_t)&posix_memalign},
     {"sched_yield", (uintptr_t)&sched_yield},
@@ -380,18 +416,33 @@ DynLibFunction dynlib_functions_extra[] = {
     {"socketpair", (uintptr_t)&socketpair},
 
     /* C++ ABI */
-    {"__cxa_finalize", (uintptr_t)&ret0},
-    {"__cxa_atexit", (uintptr_t)&ret0},
-    {"__register_atfork", (uintptr_t)&ret0},
+    {"__cxa_finalize", (uintptr_t)&fake_cxa_finalize},
+    {"__cxa_atexit", (uintptr_t)&fake_cxa_atexit},
+    {"__register_atfork", (uintptr_t)&fake_register_atfork},
+    {"android_set_abort_message", (uintptr_t)&fake_android_set_abort_message},
+
+    /* signals */
+    {"sigaction", (uintptr_t)&fake_sigaction},
+    {"sigemptyset", (uintptr_t)&fake_sigemptyset},
+    {"sigaltstack", (uintptr_t)&fake_sigaltstack},
+    {"signal", (uintptr_t)&signal},
+
+    /* getentropy/getauxval */
+    {"getentropy", (uintptr_t)&fake_getentropy},
+    {"getauxval", (uintptr_t)&fake_getauxval},
+
+    /* syslog */
+    {"openlog", (uintptr_t)&fake_openlog},
+    {"syslog", (uintptr_t)&fake_syslog},
+    {"closelog", (uintptr_t)&fake_closelog},
+
+    /* system property */
+    {"__system_property_get", (uintptr_t)&fake_system_property_get},
 
     /* dl */
     {"dlerror", (uintptr_t)&dlerror},
     {"dl_iterate_phdr", (uintptr_t)&dl_iterate_phdr},
 
-    /* syslog */
-    {"openlog", (uintptr_t)&openlog},
-    {"syslog", (uintptr_t)&syslog},
-    {"closelog", (uintptr_t)&closelog},
 
     /* fortified */
     {"__strlen_chk", (uintptr_t)&__strlen_chk_fake},
@@ -414,9 +465,7 @@ DynLibFunction dynlib_functions_extra[] = {
     {"__FD_SET_chk", (uintptr_t)&__FD_SET_chk_fake},
     {"__cmsg_nxthdr", (uintptr_t)&__cmsg_nxthdr_fake},
 
-    /* android system */
-    {"__system_property_get", (uintptr_t)&__system_property_get_fake},
-    {"android_set_abort_message", (uintptr_t)&android_set_abort_message_fake},
+    /* ctype */
     {"__ctype_get_mb_cur_max", (uintptr_t)&__ctype_get_mb_cur_max_fake},
 
     /* Android NDK - AConfiguration */
