@@ -1,5 +1,6 @@
 /* imports_extra.c -- Additional symbol resolution for Alien Shooter */
 #define _GNU_SOURCE
+#include <SDL2/SDL.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
