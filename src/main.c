@@ -107,7 +107,28 @@ static void jni_init(void) {
 
 typedef void (*ANativeActivity_createFunc)(ANativeActivity *, void *, size_t);
 
+#include <signal.h>
+static void crash_handler(int sig) {
+    const char *name = "UNKNOWN";
+    if (sig == SIGSEGV) name = "SIGSEGV";
+    else if (sig == SIGBUS) name = "SIGBUS";
+    else if (sig == SIGABRT) name = "SIGABRT";
+    else if (sig == SIGFPE) name = "SIGFPE";
+    fprintf(stderr, "\n*** CRASH: %s (signal %d) ***\n", name, sig);
+    fflush(stderr);
+    /* Write to log file directly */
+    FILE *f = fopen("crash.txt", "w");
+    if (f) { fprintf(f, "CRASH: %s (signal %d)\n", name, sig); fclose(f); }
+    _exit(1);
+}
+
 int main(int argc, char *argv[]) {
+    /* Install crash handlers */
+    signal(SIGSEGV, crash_handler);
+    signal(SIGBUS, crash_handler);
+    signal(SIGABRT, crash_handler);
+    signal(SIGFPE, crash_handler);
+
     debugPrintf("Alien Shooter for ARM64 Linux\n");
 
     struct stat st;
@@ -200,17 +221,24 @@ int main(int argc, char *argv[]) {
     onCreate(&activity, NULL, 0);
     debugPrintf("ANativeActivity_onCreate returned.\n");
 
+    debugPrintf("Checking callbacks: start=%p resume=%p winCreated=%p focus=%p\n",
+        callbacks.onStart, callbacks.onResume,
+        callbacks.onNativeWindowCreated, callbacks.onWindowFocusChanged);
+
+    debugPrintf("Waiting 500ms for game thread...\n");
     usleep(500000);
+    debugPrintf("Wait done.\n");
 
     debugPrintf("Sending lifecycle...\n");
     if (callbacks.onNativeWindowCreated) {
+        debugPrintf("  calling onNativeWindowCreated(%p)...\n", g_sdl_window);
         callbacks.onNativeWindowCreated(&activity, g_sdl_window);
-        debugPrintf("  onNativeWindowCreated\n");
-    }
+        debugPrintf("  onNativeWindowCreated done\n");
+    } else { debugPrintf("  onNativeWindowCreated is NULL!\n"); }
     usleep(200000);
-    if (callbacks.onStart) { callbacks.onStart(&activity); debugPrintf("  onStart\n"); }
-    if (callbacks.onResume) { callbacks.onResume(&activity); debugPrintf("  onResume\n"); }
-    if (callbacks.onWindowFocusChanged) { callbacks.onWindowFocusChanged(&activity, 1); debugPrintf("  onWindowFocusChanged\n"); }
+    if (callbacks.onStart) { debugPrintf("  calling onStart...\n"); callbacks.onStart(&activity); debugPrintf("  onStart done\n"); }
+    if (callbacks.onResume) { debugPrintf("  calling onResume...\n"); callbacks.onResume(&activity); debugPrintf("  onResume done\n"); }
+    if (callbacks.onWindowFocusChanged) { debugPrintf("  calling onWindowFocusChanged...\n"); callbacks.onWindowFocusChanged(&activity, 1); debugPrintf("  onWindowFocusChanged done\n"); }
 
     debugPrintf("Entering main loop...\n");
     SDL_Event event;
