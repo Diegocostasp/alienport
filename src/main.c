@@ -68,6 +68,9 @@ struct ANativeActivity {
 static jint fake_GetVersion(JNIEnv *e) { return JNI_VERSION_1_6; }
 static jclass fake_FindClass(JNIEnv *e, const char *n) {
   debugPrintf("FindClass: %s\n", n);
+  return (jclass)0x41414141;
+}
+
 #define MAX_METHODS 256
 static char method_names[MAX_METHODS][256];
 static int method_count = 0;
