@@ -134,7 +134,16 @@ static jboolean fake_CallBooleanMethodV(JNIEnv *e, jobject o, jmethodID m,
 }
 static jint fake_CallIntMethodV(JNIEnv *e, jobject o, jmethodID m,
                                 va_list args) {
-  return 0;
+  return 100;
+}
+
+static jint fake_CallStaticIntMethodV(JNIEnv *e, jclass c, jmethodID m, va_list args) { 
+    debugPrintf("CallStaticIntMethodV called\n");
+    return 28; 
+}
+static jobject fake_CallStaticObjectMethodV(JNIEnv *e, jclass c, jmethodID m, va_list args) { 
+    debugPrintf("CallStaticObjectMethodV called\n");
+    return (jobject)dummy_string; 
 }
 
 static void jni_init(void) {
@@ -167,6 +176,8 @@ static void jni_init(void) {
   jni_funcs.CallObjectMethodV = fake_CallObjectMethodV;
   jni_funcs.CallBooleanMethodV = fake_CallBooleanMethodV;
   jni_funcs.CallIntMethodV = fake_CallIntMethodV;
+  jni_funcs.CallStaticIntMethodV = fake_CallStaticIntMethodV;
+  jni_funcs.CallStaticObjectMethodV = fake_CallStaticObjectMethodV;
 
   jvm_funcs.AttachCurrentThread = fake_AttachCurrentThread;
   jvm_funcs.DetachCurrentThread = fake_DetachCurrentThread;
