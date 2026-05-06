@@ -67,18 +67,22 @@ struct ANativeActivity {
 /* Fake JNI */
 static jint fake_GetVersion(JNIEnv *e) { return JNI_VERSION_1_6; }
 static jclass fake_FindClass(JNIEnv *e, const char *n) {
+  debugPrintf("FindClass: %s\n", n);
   return (jclass)0x41414141;
 }
 static jmethodID fake_GetMethodID(JNIEnv *e, jclass c, const char *n,
                                   const char *s) {
+  debugPrintf("GetMethodID: %s %s\n", n, s);
   return (jmethodID)0x42424242;
 }
 static jmethodID fake_GetStaticMethodID(JNIEnv *e, jclass c, const char *n,
                                         const char *s) {
+  debugPrintf("GetStaticMethodID: %s %s\n", n, s);
   return (jmethodID)0x43434343;
 }
 static jfieldID fake_GetFieldID(JNIEnv *e, jclass c, const char *n,
                                 const char *s) {
+  debugPrintf("GetFieldID: %s %s\n", n, s);
   return (jfieldID)0x44444444;
 }
 static jstring fake_NewStringUTF(JNIEnv *e, const char *s) {
@@ -122,7 +126,7 @@ static jthrowable fake_ExceptionOccurred(JNIEnv *e) { return NULL; }
 static jclass fake_GetObjectClass(JNIEnv *e, jobject o) {
   return (jclass)0x45454545;
 }
-static char dummy_string[256] = "dummy";
+static char dummy_string[256] = "./data";
 static jobject fake_CallObjectMethodV(JNIEnv *e, jobject o, jmethodID m,
                                       va_list args) {
   debugPrintf("CallObjectMethodV called\n");
