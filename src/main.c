@@ -145,6 +145,8 @@ static jobject fake_CallStaticObjectMethodV(JNIEnv *e, jclass c, jmethodID m, va
     debugPrintf("CallStaticObjectMethodV called\n");
     return (jobject)dummy_string; 
 }
+static jsize fake_GetArrayLength(JNIEnv *e, jarray array) { return 1; }
+static jobject fake_GetObjectArrayElement(JNIEnv *e, jobjectArray a, jsize i) { return (jobject)dummy_string; }
 
 static void jni_init(void) {
   /* Fill entire struct with the generic stub to prevent NULL pointer calls */
@@ -178,6 +180,8 @@ static void jni_init(void) {
   jni_funcs.CallIntMethodV = fake_CallIntMethodV;
   jni_funcs.CallStaticIntMethodV = fake_CallStaticIntMethodV;
   jni_funcs.CallStaticObjectMethodV = fake_CallStaticObjectMethodV;
+  jni_funcs.GetArrayLength = fake_GetArrayLength;
+  jni_funcs.GetObjectArrayElement = fake_GetObjectArrayElement;
 
   jvm_funcs.AttachCurrentThread = fake_AttachCurrentThread;
   jvm_funcs.DetachCurrentThread = fake_DetachCurrentThread;
