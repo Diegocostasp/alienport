@@ -70,14 +70,18 @@ static jclass fake_FindClass(JNIEnv *e, const char *n) {
   debugPrintf("FindClass: %s\n", n);
   return (jclass)0x41414141;
 }
+static char last_method_name[256] = "";
 static jmethodID fake_GetMethodID(JNIEnv *e, jclass c, const char *n,
                                   const char *s) {
   debugPrintf("GetMethodID: %s %s\n", n, s);
+  strncpy(last_method_name, n, sizeof(last_method_name) - 1);
   return (jmethodID)0x42424242;
 }
+static char last_static_method_name[256] = "";
 static jmethodID fake_GetStaticMethodID(JNIEnv *e, jclass c, const char *n,
                                         const char *s) {
   debugPrintf("GetStaticMethodID: %s %s\n", n, s);
+  strncpy(last_static_method_name, n, sizeof(last_static_method_name) - 1);
   return (jmethodID)0x43434343;
 }
 static jfieldID fake_GetFieldID(JNIEnv *e, jclass c, const char *n,
@@ -129,7 +133,12 @@ static jclass fake_GetObjectClass(JNIEnv *e, jobject o) {
 static char dummy_string[256] = "./data";
 static jobject fake_CallObjectMethodV(JNIEnv *e, jobject o, jmethodID m,
                                       va_list args) {
-  debugPrintf("CallObjectMethodV called\n");
+  if (strcmp(last_method_name, "loadClass") == 0) {
+      jstring arg_str = va_arg(args, jstring);
+      debugPrintf("CallObjectMethodV called for: %s (arg: %s)\n", last_method_name, (const char*)arg_str);
+  } else {
+      debugPrintf("CallObjectMethodV called for: %s\n", last_method_name);
+  }
   return (jobject)dummy_string;
 }
 static jboolean fake_CallBooleanMethodV(JNIEnv *e, jobject o, jmethodID m,
@@ -138,15 +147,22 @@ static jboolean fake_CallBooleanMethodV(JNIEnv *e, jobject o, jmethodID m,
 }
 static jint fake_CallIntMethodV(JNIEnv *e, jobject o, jmethodID m,
                                 va_list args) {
+  debugPrintf("CallIntMethodV called for: %s\n", last_method_name);
   return 100;
 }
 
 static jint fake_CallStaticIntMethodV(JNIEnv *e, jclass c, jmethodID m, va_list args) { 
-    debugPrintf("CallStaticIntMethodV called\n");
+    if (strcmp(last_static_method_name, "initialize") == 0) {
+        jstring arg_str = va_arg(args, jstring);
+        jint arg_num = va_arg(args, jint);
+        debugPrintf("CallStaticIntMethodV called for: %s (str: %s, num: %d)\n", last_static_method_name, (const char*)arg_str, arg_num);
+        return 0; // Often 0 means success in C-like APIs wrapped in Java
+    }
+    debugPrintf("CallStaticIntMethodV called for: %s\n", last_static_method_name);
     return 28; 
 }
 static jobject fake_CallStaticObjectMethodV(JNIEnv *e, jclass c, jmethodID m, va_list args) { 
-    debugPrintf("CallStaticObjectMethodV called\n");
+    debugPrintf("CallStaticObjectMethodV called for: %s\n", last_static_method_name);
     return (jobject)dummy_string; 
 }
 static jsize fake_GetArrayLength(JNIEnv *e, jarray array) { return 1; }
