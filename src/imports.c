@@ -157,7 +157,15 @@ static AAsset *fake_AAssetManager_open(void *mgr, const char *filename, int mode
 static int fake_AAsset_read(AAsset *asset, void *buf, size_t count) {
     debugPrintf("AAsset_read called: count=%zu\n", count);
     if (!asset || !asset->fp) return -1;
-    return fread(buf, 1, count, asset->fp);
+    // For debugging: only return 10 bytes to see if it changes the crash
+    size_t to_read = count > 10 ? 10 : count;
+    int res = fread(buf, 1, to_read, asset->fp);
+    if (count > 10) {
+        // Zero out the rest of the buffer just in case
+        memset((char*)buf + to_read, 0, count - to_read);
+        res = count; // Pretend we read the full count to avoid early EOF checks
+    }
+    return res;
 }
 
 static off_t fake_AAsset_seek(AAsset *asset, off_t offset, int whence) {
