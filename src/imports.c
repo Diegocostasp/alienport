@@ -120,6 +120,16 @@ int pthread_cond_init_fake(pthread_cond_t **cnd, const int *condattr) {
     return 0;
 }
 
+static void *fake_AAssetManager_open(void *mgr, const char *filename, int mode) {
+    debugPrintf("AAssetManager_open called for: %s\n", filename);
+    return NULL;
+}
+
+static void *fake_AAssetManager_fromJava(void *env, void *assetManager) {
+    debugPrintf("AAssetManager_fromJava called\n");
+    return NULL;
+}
+
 int pthread_cond_broadcast_fake(pthread_cond_t **cnd) {
     if (!*cnd) { if (pthread_cond_init_fake(cnd, NULL) < 0) return -1; }
     return pthread_cond_broadcast(*cnd);
@@ -151,8 +161,9 @@ int pthread_once_fake(volatile int *once_control, void (*init_routine)(void)) {
     return 0;
 }
 
-int pthread_create_fake(pthread_t *thread, const void *unused, void *entry, void *arg) {
-    return pthread_create(thread, NULL, entry, arg);
+int pthread_create_fake(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg) {
+    debugPrintf("pthread_create called: start_routine=%p\n", start_routine);
+    return pthread_create(thread, attr, start_routine, arg);
 }
 
 /* OpenSL ES stubs (libOpenSLES.so) */
@@ -173,8 +184,8 @@ DynLibFunction dynlib_functions[] = {
     {"__assert2", (uintptr_t)&__assert2},
 
     /* AAssetManager stubs */
-    {"AAssetManager_open", (uintptr_t)&ret0},
-    {"AAssetManager_fromJava", (uintptr_t)&ret0},
+    {"AAssetManager_open", (uintptr_t)&fake_AAssetManager_open},
+    {"AAssetManager_fromJava", (uintptr_t)&fake_AAssetManager_fromJava},
     {"AAsset_close", (uintptr_t)&ret0},
     {"AAsset_getLength", (uintptr_t)&ret0},
     {"AAsset_getRemainingLength", (uintptr_t)&ret0},
