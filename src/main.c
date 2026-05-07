@@ -153,9 +153,6 @@ static jobject fake_CallObjectMethodV(JNIEnv *e, jobject o, jmethodID m,
   if (strcmp(mname, "loadClass") == 0) {
     jstring arg_str = va_arg(args, jstring);
     debugPrintf("CallObjectMethodV called for: %s (arg: %p)\n", mname, arg_str);
-    if (arg_str && (uintptr_t)arg_str > 4096) {
-      debugPrintf("  string content: %s\n", (const char *)arg_str);
-    }
   } else {
     debugPrintf("CallObjectMethodV called for: %s\n", mname);
   }
@@ -190,9 +187,6 @@ static jint fake_CallStaticIntMethodV(JNIEnv *e, jclass c, jmethodID m,
     jint arg_num = va_arg(args, jint);
     debugPrintf("CallStaticIntMethodV called for: %s (str: %p, num: %d)\n",
                 mname, arg_str, arg_num);
-    if (arg_str) {
-      debugPrintf("  string content: %s\n", (const char *)arg_str);
-    }
     return 0; // Often 0 means success in C-like APIs wrapped in Java
   }
   debugPrintf("CallStaticIntMethodV called for: %s\n", mname);
