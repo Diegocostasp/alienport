@@ -161,9 +161,9 @@ int pthread_once_fake(volatile int *once_control, void (*init_routine)(void)) {
     return 0;
 }
 
-int pthread_create_fake(pthread_t *thread, const pthread_attr_t *attr, void *(*start_routine) (void *), void *arg) {
+int pthread_create_fake(pthread_t *thread, const void *attr, void *(*start_routine) (void *), void *arg) {
     debugPrintf("pthread_create called: start_routine=%p\n", start_routine);
-    return pthread_create(thread, attr, start_routine, arg);
+    return pthread_create(thread, NULL, start_routine, arg);
 }
 
 /* OpenSL ES stubs (libOpenSLES.so) */
