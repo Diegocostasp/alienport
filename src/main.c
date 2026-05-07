@@ -79,9 +79,9 @@ static jmethodID fake_GetMethodID(JNIEnv *e, jclass c, const char *n,
                                   const char *s) {
   debugPrintf("GetMethodID: %s %s\n", n, s);
   if (method_count < MAX_METHODS) {
-      strncpy(method_names[method_count], n, 255);
-      method_names[method_count][255] = '\0';
-      return (jmethodID)(uintptr_t)(0x1000 + method_count++);
+    strncpy(method_names[method_count], n, 255);
+    method_names[method_count][255] = '\0';
+    return (jmethodID)(uintptr_t)(0x1000 + method_count++);
   }
   return (jmethodID)0x42424242;
 }
@@ -90,9 +90,9 @@ static jmethodID fake_GetStaticMethodID(JNIEnv *e, jclass c, const char *n,
                                         const char *s) {
   debugPrintf("GetStaticMethodID: %s %s\n", n, s);
   if (method_count < MAX_METHODS) {
-      strncpy(method_names[method_count], n, 255);
-      method_names[method_count][255] = '\0';
-      return (jmethodID)(uintptr_t)(0x1000 + method_count++);
+    strncpy(method_names[method_count], n, 255);
+    method_names[method_count][255] = '\0';
+    return (jmethodID)(uintptr_t)(0x1000 + method_count++);
   }
   return (jmethodID)0x43434343;
 }
@@ -102,6 +102,7 @@ static jfieldID fake_GetFieldID(JNIEnv *e, jclass c, const char *n,
   return (jfieldID)0x44444444;
 }
 static jstring fake_NewStringUTF(JNIEnv *e, const char *s) {
+  debugPrintf("NewStringUTF: %s\n", s);
   return (jstring)(uintptr_t)s;
 }
 static const char *fake_GetStringUTFChars(JNIEnv *e, jstring s, jboolean *c) {
@@ -146,23 +147,25 @@ static char dummy_string[256] = "./data";
 static jobject fake_CallObjectMethodV(JNIEnv *e, jobject o, jmethodID m,
                                       va_list args) {
   int id = (int)(uintptr_t)m - 0x1000;
-  const char *mname = (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
-  
+  const char *mname =
+      (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
+
   if (strcmp(mname, "loadClass") == 0) {
-      jstring arg_str = va_arg(args, jstring);
-      debugPrintf("CallObjectMethodV called for: %s (arg: %p)\n", mname, arg_str);
-      if (arg_str) {
-          debugPrintf("  string content: %s\n", (const char*)arg_str);
-      }
+    jstring arg_str = va_arg(args, jstring);
+    debugPrintf("CallObjectMethodV called for: %s (arg: %p)\n", mname, arg_str);
+    if (arg_str && (uintptr_t)arg_str > 4096) {
+      debugPrintf("  string content: %s\n", (const char *)arg_str);
+    }
   } else {
-      debugPrintf("CallObjectMethodV called for: %s\n", mname);
+    debugPrintf("CallObjectMethodV called for: %s\n", mname);
   }
   return (jobject)dummy_string;
 }
 static jint fake_CallIntMethodV(JNIEnv *e, jobject o, jmethodID m,
                                 va_list args) {
   int id = (int)(uintptr_t)m - 0x1000;
-  const char *mname = (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
+  const char *mname =
+      (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
   debugPrintf("CallIntMethodV called for: %s\n", mname);
   return 100;
 }
@@ -170,35 +173,43 @@ static jint fake_CallIntMethodV(JNIEnv *e, jobject o, jmethodID m,
 static jboolean fake_CallBooleanMethodV(JNIEnv *e, jobject o, jmethodID m,
                                         va_list args) {
   int id = (int)(uintptr_t)m - 0x1000;
-  const char *mname = (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
+  const char *mname =
+      (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
   debugPrintf("CallBooleanMethodV called for: %s\n", mname);
   return 0;
 }
 
-static jint fake_CallStaticIntMethodV(JNIEnv *e, jclass c, jmethodID m, va_list args) { 
-    int id = (int)(uintptr_t)m - 0x1000;
-    const char *mname = (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
-    
-    if (strcmp(mname, "initialize") == 0) {
-        jstring arg_str = va_arg(args, jstring);
-        jint arg_num = va_arg(args, jint);
-        debugPrintf("CallStaticIntMethodV called for: %s (str: %p, num: %d)\n", mname, arg_str, arg_num);
-        if (arg_str) {
-            debugPrintf("  string content: %s\n", (const char*)arg_str);
-        }
-        return 0; // Often 0 means success in C-like APIs wrapped in Java
+static jint fake_CallStaticIntMethodV(JNIEnv *e, jclass c, jmethodID m,
+                                      va_list args) {
+  int id = (int)(uintptr_t)m - 0x1000;
+  const char *mname =
+      (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
+
+  if (strcmp(mname, "initialize") == 0) {
+    jstring arg_str = va_arg(args, jstring);
+    jint arg_num = va_arg(args, jint);
+    debugPrintf("CallStaticIntMethodV called for: %s (str: %p, num: %d)\n",
+                mname, arg_str, arg_num);
+    if (arg_str) {
+      debugPrintf("  string content: %s\n", (const char *)arg_str);
     }
-    debugPrintf("CallStaticIntMethodV called for: %s\n", mname);
-    return 28; 
+    return 0; // Often 0 means success in C-like APIs wrapped in Java
+  }
+  debugPrintf("CallStaticIntMethodV called for: %s\n", mname);
+  return 28;
 }
-static jobject fake_CallStaticObjectMethodV(JNIEnv *e, jclass c, jmethodID m, va_list args) { 
-    int id = (int)(uintptr_t)m - 0x1000;
-    const char *mname = (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
-    debugPrintf("CallStaticObjectMethodV called for: %s\n", mname);
-    return (jobject)dummy_string; 
+static jobject fake_CallStaticObjectMethodV(JNIEnv *e, jclass c, jmethodID m,
+                                            va_list args) {
+  int id = (int)(uintptr_t)m - 0x1000;
+  const char *mname =
+      (id >= 0 && id < method_count) ? method_names[id] : "UNKNOWN";
+  debugPrintf("CallStaticObjectMethodV called for: %s\n", mname);
+  return (jobject)dummy_string;
 }
 static jsize fake_GetArrayLength(JNIEnv *e, jarray array) { return 1; }
-static jobject fake_GetObjectArrayElement(JNIEnv *e, jobjectArray a, jsize i) { return (jobject)dummy_string; }
+static jobject fake_GetObjectArrayElement(JNIEnv *e, jobjectArray a, jsize i) {
+  return (jobject)dummy_string;
+}
 
 static void jni_init(void) {
   /* Fill entire struct with the generic stub to prevent NULL pointer calls */
