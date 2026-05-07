@@ -576,7 +576,6 @@ DynLibFunction dynlib_functions_extra[] = {
     {"AMotionEvent_getEventTime", (uintptr_t)&fake_AME_getEvTime},
     {"AKeyEvent_getAction", (uintptr_t)&fake_AKE_getAction},
     {"AKeyEvent_getKeyCode", (uintptr_t)&fake_AKE_getKeyCode},
-    {"AAsset_openFileDescriptor", (uintptr_t)&fake_AAsset_openFD},
 
     /* OpenSL ES IIDs */
     {"SL_IID_ENGINE", (uintptr_t)&SL_IID_ENGINE_fake},
