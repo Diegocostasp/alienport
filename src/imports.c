@@ -120,14 +120,74 @@ int pthread_cond_init_fake(pthread_cond_t **cnd, const int *condattr) {
     return 0;
 }
 
-static void *fake_AAssetManager_open(void *mgr, const char *filename, int mode) {
-    debugPrintf("AAssetManager_open called for: %s\n", filename);
-    return NULL;
-}
+typedef struct AAsset {
+    FILE* fp;
+    long length;
+} AAsset;
 
 static void *fake_AAssetManager_fromJava(void *env, void *assetManager) {
     debugPrintf("AAssetManager_fromJava called\n");
-    return NULL;
+    return (void*)0x1234; // return a dummy manager pointer
+}
+
+static AAsset *fake_AAssetManager_open(void *mgr, const char *filename, int mode) {
+    debugPrintf("AAssetManager_open called for: %s\n", filename);
+    char path[512];
+    snprintf(path, sizeof(path), "./assets/%s", filename);
+    FILE *fp = fopen(path, "rb");
+    if (!fp) {
+        snprintf(path, sizeof(path), "%s", filename);
+        fp = fopen(path, "rb");
+    }
+    if (!fp) {
+        debugPrintf("Failed to open asset: %s\n", filename);
+        return NULL;
+    }
+    fseek(fp, 0, SEEK_END);
+    long length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    AAsset *asset = malloc(sizeof(AAsset));
+    asset->fp = fp;
+    asset->length = length;
+    return asset;
+}
+
+static int fake_AAsset_read(AAsset *asset, void *buf, size_t count) {
+    if (!asset || !asset->fp) return -1;
+    return fread(buf, 1, count, asset->fp);
+}
+
+static off_t fake_AAsset_seek(AAsset *asset, off_t offset, int whence) {
+    if (!asset || !asset->fp) return -1;
+    fseek(asset->fp, offset, whence);
+    return ftell(asset->fp);
+}
+
+static void fake_AAsset_close(AAsset *asset) {
+    if (!asset) return;
+    if (asset->fp) fclose(asset->fp);
+    free(asset);
+}
+
+static off_t fake_AAsset_getLength(AAsset *asset) {
+    if (!asset) return 0;
+    return asset->length;
+}
+
+static off_t fake_AAsset_getRemainingLength(AAsset *asset) {
+    if (!asset || !asset->fp) return 0;
+    long current = ftell(asset->fp);
+    return asset->length - current;
+}
+
+static int fake_AAsset_openFileDescriptor(AAsset *asset, off_t *outStart, off_t *outLength) {
+    if (!asset || !asset->fp) return -1;
+    int fd = fileno(asset->fp);
+    int new_fd = dup(fd); // dup so when AAsset_close is called, the game can still read from this fd
+    if (outStart) *outStart = 0; // we don't pack files, it starts at 0
+    if (outLength) *outLength = asset->length;
+    return new_fd;
 }
 
 int pthread_cond_broadcast_fake(pthread_cond_t **cnd) {
@@ -186,11 +246,12 @@ DynLibFunction dynlib_functions[] = {
     /* AAssetManager stubs */
     {"AAssetManager_open", (uintptr_t)&fake_AAssetManager_open},
     {"AAssetManager_fromJava", (uintptr_t)&fake_AAssetManager_fromJava},
-    {"AAsset_close", (uintptr_t)&ret0},
-    {"AAsset_getLength", (uintptr_t)&ret0},
-    {"AAsset_getRemainingLength", (uintptr_t)&ret0},
-    {"AAsset_read", (uintptr_t)&ret0},
-    {"AAsset_seek", (uintptr_t)&ret0},
+    {"AAsset_close", (uintptr_t)&fake_AAsset_close},
+    {"AAsset_getLength", (uintptr_t)&fake_AAsset_getLength},
+    {"AAsset_getRemainingLength", (uintptr_t)&fake_AAsset_getRemainingLength},
+    {"AAsset_read", (uintptr_t)&fake_AAsset_read},
+    {"AAsset_seek", (uintptr_t)&fake_AAsset_seek},
+    {"AAsset_openFileDescriptor", (uintptr_t)&fake_AAsset_openFileDescriptor},
 
     /* ANativeWindow stubs */
     {"ANativeWindow_setBuffersGeometry", (uintptr_t)&ret0},
