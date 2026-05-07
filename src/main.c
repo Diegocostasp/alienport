@@ -187,7 +187,7 @@ static jint fake_CallStaticIntMethodV(JNIEnv *e, jclass c, jmethodID m,
     jint arg_num = va_arg(args, jint);
     debugPrintf("CallStaticIntMethodV called for: %s (str: %p, num: %d)\n",
                 mname, arg_str, arg_num);
-    return 0x40000000; // Return dummy 32-bit pointer to check crash address
+    return 0; // Return 0 (typically success) to avoid triggering error paths
   }
   debugPrintf("CallStaticIntMethodV called for: %s\n", mname);
   return 28;
