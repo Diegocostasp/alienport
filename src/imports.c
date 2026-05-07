@@ -150,38 +150,45 @@ static AAsset *fake_AAssetManager_open(void *mgr, const char *filename, int mode
     AAsset *asset = malloc(sizeof(AAsset));
     asset->fp = fp;
     asset->length = length;
+    debugPrintf("Returning AAsset* %p\n", asset);
     return asset;
 }
 
 static int fake_AAsset_read(AAsset *asset, void *buf, size_t count) {
+    debugPrintf("AAsset_read called: count=%zu\n", count);
     if (!asset || !asset->fp) return -1;
     return fread(buf, 1, count, asset->fp);
 }
 
 static off_t fake_AAsset_seek(AAsset *asset, off_t offset, int whence) {
+    debugPrintf("AAsset_seek called: offset=%ld, whence=%d\n", (long)offset, whence);
     if (!asset || !asset->fp) return -1;
     fseek(asset->fp, offset, whence);
     return ftell(asset->fp);
 }
 
 static void fake_AAsset_close(AAsset *asset) {
+    debugPrintf("AAsset_close called\n");
     if (!asset) return;
     if (asset->fp) fclose(asset->fp);
     free(asset);
 }
 
 static off_t fake_AAsset_getLength(AAsset *asset) {
+    debugPrintf("AAsset_getLength called\n");
     if (!asset) return 0;
     return asset->length;
 }
 
 static off_t fake_AAsset_getRemainingLength(AAsset *asset) {
+    debugPrintf("AAsset_getRemainingLength called\n");
     if (!asset || !asset->fp) return 0;
     long current = ftell(asset->fp);
     return asset->length - current;
 }
 
 static int fake_AAsset_openFileDescriptor(AAsset *asset, off_t *outStart, off_t *outLength) {
+    debugPrintf("AAsset_openFileDescriptor called\n");
     if (!asset || !asset->fp) return -1;
     int fd = fileno(asset->fp);
     int new_fd = dup(fd); // dup so when AAsset_close is called, the game can still read from this fd
