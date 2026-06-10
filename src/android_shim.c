@@ -56,10 +56,10 @@ static ANativeActivityCallbacks g_callbacks;
 static SDL_Window *g_sdl_window = NULL;
 
 // Fake window handle - we just use a pointer to distinguish it from NULL
-static int g_fake_native_window = 1;
+static long long g_fake_native_window __attribute__((aligned(8))) = 1;
 
 // Fake input queue handle
-static int g_fake_input_queue = 1;
+static long long g_fake_input_queue __attribute__((aligned(8))) = 1;
 
 /* ---- Input event queue helpers ---- */
 
@@ -315,7 +315,7 @@ static void process_sdl_events(void) {
 
 ALooper *ALooper_prepare(int opts) {
   (void)opts;
-  static int fake_looper;
+  static long long fake_looper __attribute__((aligned(8)));
   return (ALooper *)&fake_looper;
 }
 
@@ -493,7 +493,7 @@ int AInputEvent_getSource(void *event) {
 
 /* ---- AConfiguration stubs ---- */
 
-static int g_fake_config = 0;
+static long long g_fake_config __attribute__((aligned(8))) = 0;
 
 AConfiguration *AConfiguration_new(void) {
   return (AConfiguration *)&g_fake_config;
@@ -552,7 +552,7 @@ int AConfiguration_getScreenSize(void *config) {
 /* ---- ASensorManager stubs ---- */
 
 ASensorManager *ASensorManager_getInstance(void) {
-  static int fake_sensor_mgr;
+  static long long fake_sensor_mgr __attribute__((aligned(8)));
   return (ASensorManager *)&fake_sensor_mgr;
 }
 
@@ -571,7 +571,7 @@ ASensorEventQueue *ASensorManager_createEventQueue(void *manager,
   (void)ident;
   (void)callback;
   (void)data;
-  static int fake_event_queue;
+  static long long fake_event_queue __attribute__((aligned(8)));
   return (ASensorEventQueue *)&fake_event_queue;
 }
 
