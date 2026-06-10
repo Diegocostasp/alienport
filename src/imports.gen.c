@@ -145,6 +145,35 @@ ssize_t fake___write_chk(int fd, const void *buf, size_t nbytes, size_t buflen) 
 int fake___FD_SET_chk(int fd, fd_set *set, size_t buflen) { FD_SET(fd, set); return 0; }
 int fake___poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, size_t buflen) { return poll(fds, nfds, timeout); }
 
+// PTHREAD SHIMS (Android structs are 40-56 bytes, Glibc are 48-64 bytes)
+typedef struct { void* ptr; } wrapper_t;
+
+int fake_pthread_mutex_init(wrapper_t *m, const pthread_mutexattr_t *attr) { m->ptr = malloc(sizeof(pthread_mutex_t)); return pthread_mutex_init(m->ptr, attr); }
+int fake_pthread_mutex_lock(wrapper_t *m) { if (!m->ptr) { m->ptr = malloc(sizeof(pthread_mutex_t)); pthread_mutex_init(m->ptr, NULL); } return pthread_mutex_lock(m->ptr); }
+int fake_pthread_mutex_unlock(wrapper_t *m) { if (!m->ptr) return 0; return pthread_mutex_unlock(m->ptr); }
+int fake_pthread_mutex_trylock(wrapper_t *m) { if (!m->ptr) { m->ptr = malloc(sizeof(pthread_mutex_t)); pthread_mutex_init(m->ptr, NULL); } return pthread_mutex_trylock(m->ptr); }
+int fake_pthread_mutex_destroy(wrapper_t *m) { if (!m->ptr) return 0; int r = pthread_mutex_destroy(m->ptr); free(m->ptr); m->ptr = NULL; return r; }
+
+int fake_pthread_cond_init(wrapper_t *c, const pthread_condattr_t *attr) { c->ptr = malloc(sizeof(pthread_cond_t)); return pthread_cond_init(c->ptr, attr); }
+int fake_pthread_cond_wait(wrapper_t *c, wrapper_t *m) { if (!c->ptr) { c->ptr = malloc(sizeof(pthread_cond_t)); pthread_cond_init(c->ptr, NULL); } return pthread_cond_wait(c->ptr, m->ptr); }
+int fake_pthread_cond_timedwait(wrapper_t *c, wrapper_t *m, const struct timespec *abstime) { if (!c->ptr) { c->ptr = malloc(sizeof(pthread_cond_t)); pthread_cond_init(c->ptr, NULL); } return pthread_cond_timedwait(c->ptr, m->ptr, abstime); }
+int fake_pthread_cond_signal(wrapper_t *c) { if (!c->ptr) return 0; return pthread_cond_signal(c->ptr); }
+int fake_pthread_cond_broadcast(wrapper_t *c) { if (!c->ptr) return 0; return pthread_cond_broadcast(c->ptr); }
+int fake_pthread_cond_destroy(wrapper_t *c) { if (!c->ptr) return 0; int r = pthread_cond_destroy(c->ptr); free(c->ptr); c->ptr = NULL; return r; }
+
+int fake_pthread_rwlock_init(wrapper_t *rw, const pthread_rwlockattr_t *attr) { rw->ptr = malloc(sizeof(pthread_rwlock_t)); return pthread_rwlock_init(rw->ptr, attr); }
+int fake_pthread_rwlock_rdlock(wrapper_t *rw) { if (!rw->ptr) { rw->ptr = malloc(sizeof(pthread_rwlock_t)); pthread_rwlock_init(rw->ptr, NULL); } return pthread_rwlock_rdlock(rw->ptr); }
+int fake_pthread_rwlock_wrlock(wrapper_t *rw) { if (!rw->ptr) { rw->ptr = malloc(sizeof(pthread_rwlock_t)); pthread_rwlock_init(rw->ptr, NULL); } return pthread_rwlock_wrlock(rw->ptr); }
+int fake_pthread_rwlock_unlock(wrapper_t *rw) { if (!rw->ptr) return 0; return pthread_rwlock_unlock(rw->ptr); }
+int fake_pthread_rwlock_destroy(wrapper_t *rw) { if (!rw->ptr) return 0; int r = pthread_rwlock_destroy(rw->ptr); free(rw->ptr); rw->ptr = NULL; return r; }
+
+int fake_pthread_attr_init(wrapper_t *a) { a->ptr = malloc(sizeof(pthread_attr_t)); return pthread_attr_init(a->ptr); }
+int fake_pthread_attr_setdetachstate(wrapper_t *a, int state) { if (!a->ptr) return 0; return pthread_attr_setdetachstate(a->ptr, state); }
+int fake_pthread_attr_destroy(wrapper_t *a) { if (!a->ptr) return 0; int r = pthread_attr_destroy(a->ptr); free(a->ptr); a->ptr = NULL; return r; }
+
+int fake_pthread_create(pthread_t *thread, wrapper_t *attr, void *(*start_routine) (void *), void *arg) { return pthread_create(thread, attr ? attr->ptr : NULL, start_routine, arg); }
+
+
 int dummy_SL_IID_BUFFERQUEUE() { return 0; }
 int dummy_SL_IID_ENGINE() { return 0; }
 int dummy_SL_IID_PLAY() { return 0; }
@@ -485,16 +514,16 @@ DynLibFunction dynlib_functions[] = {
   {"posix_memalign", (uintptr_t)&posix_memalign},
   {"pow", (uintptr_t)&pow},
   {"printf", (uintptr_t)&printf},
-  {"pthread_attr_destroy", (uintptr_t)&pthread_attr_destroy},
-  {"pthread_attr_init", (uintptr_t)&pthread_attr_init},
-  {"pthread_attr_setdetachstate", (uintptr_t)&pthread_attr_setdetachstate},
-  {"pthread_cond_broadcast", (uintptr_t)&pthread_cond_broadcast},
-  {"pthread_cond_destroy", (uintptr_t)&pthread_cond_destroy},
-  {"pthread_cond_init", (uintptr_t)&pthread_cond_init},
-  {"pthread_cond_signal", (uintptr_t)&pthread_cond_signal},
-  {"pthread_cond_timedwait", (uintptr_t)&pthread_cond_timedwait},
-  {"pthread_cond_wait", (uintptr_t)&pthread_cond_wait},
-  {"pthread_create", (uintptr_t)&pthread_create},
+  {"pthread_attr_destroy", (uintptr_t)&fake_pthread_attr_destroy},
+  {"pthread_attr_init", (uintptr_t)&fake_pthread_attr_init},
+  {"pthread_attr_setdetachstate", (uintptr_t)&fake_pthread_attr_setdetachstate},
+  {"pthread_cond_broadcast", (uintptr_t)&fake_pthread_cond_broadcast},
+  {"pthread_cond_destroy", (uintptr_t)&fake_pthread_cond_destroy},
+  {"pthread_cond_init", (uintptr_t)&fake_pthread_cond_init},
+  {"pthread_cond_signal", (uintptr_t)&fake_pthread_cond_signal},
+  {"pthread_cond_timedwait", (uintptr_t)&fake_pthread_cond_timedwait},
+  {"pthread_cond_wait", (uintptr_t)&fake_pthread_cond_wait},
+  {"pthread_create", (uintptr_t)&fake_pthread_create},
   {"pthread_detach", (uintptr_t)&pthread_detach},
   {"pthread_equal", (uintptr_t)&pthread_equal},
   {"pthread_exit", (uintptr_t)&pthread_exit},
@@ -502,20 +531,20 @@ DynLibFunction dynlib_functions[] = {
   {"pthread_join", (uintptr_t)&pthread_join},
   {"pthread_key_create", (uintptr_t)&pthread_key_create},
   {"pthread_key_delete", (uintptr_t)&pthread_key_delete},
-  {"pthread_mutex_destroy", (uintptr_t)&pthread_mutex_destroy},
-  {"pthread_mutex_init", (uintptr_t)&pthread_mutex_init},
-  {"pthread_mutex_lock", (uintptr_t)&pthread_mutex_lock},
-  {"pthread_mutex_trylock", (uintptr_t)&pthread_mutex_trylock},
-  {"pthread_mutex_unlock", (uintptr_t)&pthread_mutex_unlock},
+  {"pthread_mutex_destroy", (uintptr_t)&fake_pthread_mutex_destroy},
+  {"pthread_mutex_init", (uintptr_t)&fake_pthread_mutex_init},
+  {"pthread_mutex_lock", (uintptr_t)&fake_pthread_mutex_lock},
+  {"pthread_mutex_trylock", (uintptr_t)&fake_pthread_mutex_trylock},
+  {"pthread_mutex_unlock", (uintptr_t)&fake_pthread_mutex_unlock},
   {"pthread_mutexattr_destroy", (uintptr_t)&pthread_mutexattr_destroy},
   {"pthread_mutexattr_init", (uintptr_t)&pthread_mutexattr_init},
   {"pthread_mutexattr_settype", (uintptr_t)&pthread_mutexattr_settype},
   {"pthread_once", (uintptr_t)&pthread_once},
-  {"pthread_rwlock_destroy", (uintptr_t)&pthread_rwlock_destroy},
-  {"pthread_rwlock_init", (uintptr_t)&pthread_rwlock_init},
-  {"pthread_rwlock_rdlock", (uintptr_t)&pthread_rwlock_rdlock},
-  {"pthread_rwlock_unlock", (uintptr_t)&pthread_rwlock_unlock},
-  {"pthread_rwlock_wrlock", (uintptr_t)&pthread_rwlock_wrlock},
+  {"pthread_rwlock_destroy", (uintptr_t)&fake_pthread_rwlock_destroy},
+  {"pthread_rwlock_init", (uintptr_t)&fake_pthread_rwlock_init},
+  {"pthread_rwlock_rdlock", (uintptr_t)&fake_pthread_rwlock_rdlock},
+  {"pthread_rwlock_unlock", (uintptr_t)&fake_pthread_rwlock_unlock},
+  {"pthread_rwlock_wrlock", (uintptr_t)&fake_pthread_rwlock_wrlock},
   {"pthread_self", (uintptr_t)&pthread_self},
   {"pthread_setspecific", (uintptr_t)&pthread_setspecific},
   {"qsort", (uintptr_t)&qsort},
