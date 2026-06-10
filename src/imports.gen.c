@@ -1,7 +1,8 @@
+#define _GNU_SOURCE
 #include "imports.h"
 #include "so_util.h"
 #include "egl_shim.h"
-#include <libgen.h>\n#include <sys/auxv.h>\n#include <stdio.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
@@ -29,6 +30,9 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <assert.h>
+#include <libgen.h>
+#include <sys/auxv.h>
+#include <sys/ioctl.h>
 
 int ret0(void) { return 0; }
 
@@ -47,6 +51,15 @@ int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap)
     return 1;
 }
 
+int __android_log_write(int prio, const char *tag, const char *text) {
+    printf("%s: %s\n", tag, text);
+    return 1;
+}
+
+int* fake___errno(void) {
+    return &errno;
+}
+
 static uint8_t fake_sF[3][0x100];
 
 void __assert2(const char *file, int line, const char *func, const char *expr) {
@@ -60,7 +73,7 @@ typedef struct AAsset {
 } AAsset;
 
 void* fake_AAssetManager_open(void* mgr, const char* filename, int mode) {
-    debugPrintf("AAssetManager_open: %s\n", filename);
+    printf("AAssetManager_open: %s\n", filename);
     char path[256];
     snprintf(path, sizeof(path), "assets/%s", filename);
     FILE *fp = fopen(path, "rb");
@@ -102,7 +115,7 @@ long fake_AAsset_getRemainingLength(AAsset *asset) {
 }
 
 int fake_AAsset_openFileDescriptor(AAsset *asset, long *outStart, long *outLength) {
-    debugPrintf("fake_AAsset_openFileDescriptor\n");
+    printf("fake_AAsset_openFileDescriptor\n");
     return -1;
 }
 
@@ -242,7 +255,7 @@ DynLibFunction dynlib_functions[] = {
   {"__ctype_get_mb_cur_max", (uintptr_t)&dummy___ctype_get_mb_cur_max},
   {"__cxa_atexit", (uintptr_t)&dummy___cxa_atexit},
   {"__cxa_finalize", (uintptr_t)&dummy___cxa_finalize},
-  {"__errno", (uintptr_t)&__errno},
+  {"__errno", (uintptr_t)&fake___errno},
   {"__fread_chk", (uintptr_t)&dummy___fread_chk},
   {"__fwrite_chk", (uintptr_t)&dummy___fwrite_chk},
   {"__memchr_chk", (uintptr_t)&dummy___memchr_chk},
