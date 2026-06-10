@@ -465,26 +465,39 @@ int main(int argc, char *argv[]) {
   debugPrintf("Running init array...\n");
   so_execute_init_array();
 
-  // Find android_main
-  uintptr_t android_main_addr = so_find_addr("android_main");
-  if (!android_main_addr)
-    fatal_error("Could not find android_main in %s", SO_NAME);
-  debugPrintf("android_main found at %p\n", (void *)android_main_addr);
+  // Find ANativeActivity_onCreate
+  uintptr_t create_addr = so_find_addr("ANativeActivity_onCreate");
+  if (!create_addr)
+    fatal_error("Could not find ANativeActivity_onCreate in %s", SO_NAME);
+  debugPrintf("ANativeActivity_onCreate found at %p\n", (void *)create_addr);
 
   // Initialize fake Android environment (also inits SDL)
   struct android_app *app = android_shim_init();
   if (!app)
     fatal_error("Failed to initialize Android shim");
 
-  // Send initial lifecycle commands
-  android_shim_send_cmd(app, APP_CMD_INIT_WINDOW);
-  android_shim_send_cmd(app, APP_CMD_GAINED_FOCUS);
+  // Call ANativeActivity_onCreate
+  debugPrintf("Calling ANativeActivity_onCreate...\n");
+  void (*create_func)(ANativeActivity*, void*, size_t) =
+      (void (*)(ANativeActivity*, void*, size_t))create_addr;
+  create_func(app->activity, NULL, 0);
 
-  // Call android_main
-  debugPrintf("Calling android_main...\n");
-  void (*android_main_func)(struct android_app *) =
-      (void (*)(struct android_app *))android_main_addr;
-  android_main_func(app);
+  // Send initial lifecycle commands
+  if (app->activity->callbacks && app->activity->callbacks->onStart)
+      app->activity->callbacks->onStart(app->activity);
+  if (app->activity->callbacks && app->activity->callbacks->onResume)
+      app->activity->callbacks->onResume(app->activity);
+  if (app->activity->callbacks && app->activity->callbacks->onNativeWindowCreated)
+      app->activity->callbacks->onNativeWindowCreated(app->activity, app->window);
+
+  debugPrintf("Game started! Waiting in main thread...\n");
+  
+  // Keep the main thread alive since ANativeActivity_onCreate returns immediately
+  // and the game runs in its own thread.
+  #include <unistd.h>
+  while (!app->destroyRequested) {
+      usleep(100000); // sleep for 100ms
+  }
 
   debugPrintf("android_main returned\n");
 
