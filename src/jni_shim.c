@@ -40,7 +40,7 @@ enum {
   FID_GENERIC,
 };
 
-static int g_method_tags[16]; /* unique addresses used as method IDs */
+static long long g_method_tags[16] __attribute__((aligned(8))); /* unique addresses used as method IDs */
 
 /* ---- Configurable package/OBB ---- */
 static const char *g_package_name = "com.sigmateam.alienshootermobile.free";
@@ -61,7 +61,7 @@ static struct {
 static int g_jstring_count = 0;
 
 static void *make_jstring(const char *value) {
-  static char jstring_storage[MAX_JSTRINGS];
+  static long long jstring_storage[MAX_JSTRINGS] __attribute__((aligned(8)));
   if (g_jstring_count >= MAX_JSTRINGS)
     g_jstring_count = 0; /* wrap around */
   int idx = g_jstring_count++;
@@ -603,7 +603,7 @@ static jint jni_GetVersion(void *env) {
 static void *jni_FindClass(void *env, const char *name) {
   (void)env;
   debugPrintf("jni_shim: FindClass(%s)\n", name);
-  static int fake_class;
+  static long long fake_class __attribute__((aligned(8)));
   return &fake_class;
 }
 
@@ -658,7 +658,7 @@ static void *jni_CallObjectMethod(void *env, void *obj, void *methodID, ...) {
   (void)env;
   (void)obj;
   debugPrintf("jni_shim: CallObjectMethod(mid=%p)\n", methodID);
-  static int fake_obj;
+  static long long fake_obj __attribute__((aligned(8)));
   return &fake_obj;
 }
 
@@ -704,7 +704,7 @@ static void *jni_CallStaticObjectMethod(void *env, void *clazz,
   }
 
   debugPrintf("jni_shim: CallStaticObjectMethod(mid=%p) -> NULL\n", methodID);
-  static int fake_result;
+  static long long fake_result __attribute__((aligned(8)));
   return &fake_result;
 }
 
@@ -725,6 +725,8 @@ static jint jni_CallStaticIntMethod(void *env, void *clazz, void *methodID,
   (void)env;
   (void)clazz;
   (void)methodID;
+  debugPrintf("jni_shim: CallStaticIntMethod(mid=%p)
+", methodID);
   return 0;
 }
 
@@ -756,7 +758,7 @@ static void *jni_GetStaticObjectField(void *env, void *clazz, void *fieldID) {
   (void)clazz;
   (void)fieldID;
   debugPrintf("jni_shim: GetStaticObjectField -> NULL\n");
-  static int fake;
+  static long long fake __attribute__((aligned(8)));
   return &fake;
 }
 
@@ -812,7 +814,7 @@ static void jni_DeleteLocalRef(void *env, void *obj) {
 static void *jni_GetObjectClass(void *env, void *obj) {
   (void)env;
   (void)obj;
-  static int fake_obj_class;
+  static long long fake_obj_class __attribute__((aligned(8)));
   return &fake_obj_class;
 }
 
