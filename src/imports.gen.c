@@ -5,244 +5,176 @@
 #include "so_util.h"
 #include "util.h"
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <time.h>
+#include <math.h>
+#include <zlib.h>
+#include <GLES2/gl2.h>
+#include <sys/time.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <poll.h>
+#include <dirent.h>
+#include <sys/mman.h>
+#include <signal.h>
+#include <wchar.h>
+#include <locale.h>
+#include <wctype.h>
+
+
 // --- DUMMY WRAPPERS FOR UNRESOLVED IMPORTS ---
-long dummy___fread_chk(void) { debugPrintf("Called dummy: %s\n", "__fread_chk"); return 0; }
-long dummy_fileno(void) { debugPrintf("Called dummy: %s\n", "fileno"); return 0; }
-long dummy_tmpnam(void) { debugPrintf("Called dummy: %s\n", "tmpnam"); return 0; }
-long dummy___cmsg_nxthdr(void) { debugPrintf("Called dummy: %s\n", "__cmsg_nxthdr"); return 0; }
-long dummy_wcstoll(void) { debugPrintf("Called dummy: %s\n", "wcstoll"); return 0; }
-long dummy_fcntl(void) { debugPrintf("Called dummy: %s\n", "fcntl"); return 0; }
-long dummy_inet_pton(void) { debugPrintf("Called dummy: %s\n", "inet_pton"); return 0; }
-long dummy_vfprintf(void) { debugPrintf("Called dummy: %s\n", "vfprintf"); return 0; }
-long dummy_pthread_rwlock_wrlock(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_wrlock"); return 0; }
-long dummy_wcstol(void) { debugPrintf("Called dummy: %s\n", "wcstol"); return 0; }
-long dummy_iswupper_l(void) { debugPrintf("Called dummy: %s\n", "iswupper_l"); return 0; }
-long dummy_iswprint_l(void) { debugPrintf("Called dummy: %s\n", "iswprint_l"); return 0; }
-long dummy_inflateReset(void) { debugPrintf("Called dummy: %s\n", "inflateReset"); return 0; }
-long dummy_opendir(void) { debugPrintf("Called dummy: %s\n", "opendir"); return 0; }
+long dummy_pthread_attr_init(void) { debugPrintf("Called dummy: %s\n", "pthread_attr_init"); return 0; }
+long dummy___read_chk(void) { debugPrintf("Called dummy: %s\n", "__read_chk"); return 0; }
+long dummy___write_chk(void) { debugPrintf("Called dummy: %s\n", "__write_chk"); return 0; }
+long dummy___memmove_chk(void) { debugPrintf("Called dummy: %s\n", "__memmove_chk"); return 0; }
 long dummy_geteuid(void) { debugPrintf("Called dummy: %s\n", "geteuid"); return 0; }
-long dummy_ioctl(void) { debugPrintf("Called dummy: %s\n", "ioctl"); return 0; }
-long dummy_strptime(void) { debugPrintf("Called dummy: %s\n", "strptime"); return 0; }
-long dummy_pthread_rwlock_init(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_init"); return 0; }
-long dummy_wcsxfrm_l(void) { debugPrintf("Called dummy: %s\n", "wcsxfrm_l"); return 0; }
-long dummy_iswblank_l(void) { debugPrintf("Called dummy: %s\n", "iswblank_l"); return 0; }
-int dummy_SL_IID_VOLUME = 0;
-long dummy_wmemchr(void) { debugPrintf("Called dummy: %s\n", "wmemchr"); return 0; }
+long dummy_getsockname(void) { debugPrintf("Called dummy: %s\n", "getsockname"); return 0; }
+long dummy_iswxdigit_l(void) { debugPrintf("Called dummy: %s\n", "iswxdigit_l"); return 0; }
 long dummy_towupper_l(void) { debugPrintf("Called dummy: %s\n", "towupper_l"); return 0; }
-long dummy_wcstoul(void) { debugPrintf("Called dummy: %s\n", "wcstoul"); return 0; }
-long dummy_wcsnrtombs(void) { debugPrintf("Called dummy: %s\n", "wcsnrtombs"); return 0; }
-long dummy_glIsTexture(void) { debugPrintf("Called dummy: %s\n", "glIsTexture"); return 0; }
-long dummy_vasprintf(void) { debugPrintf("Called dummy: %s\n", "vasprintf"); return 0; }
-long dummy_inet_ntop(void) { debugPrintf("Called dummy: %s\n", "inet_ntop"); return 0; }
-int dummy_SL_IID_PLAY = 0;
-long dummy_accept(void) { debugPrintf("Called dummy: %s\n", "accept"); return 0; }
-long dummy___vsprintf_chk(void) { debugPrintf("Called dummy: %s\n", "__vsprintf_chk"); return 0; }
-long dummy_dlopen(void) { debugPrintf("Called dummy: %s\n", "dlopen"); return 0; }
-long dummy_mprotect(void) { debugPrintf("Called dummy: %s\n", "mprotect"); return 0; }
+long dummy_pthread_rwlock_rdlock(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_rdlock"); return 0; }
+long dummy_pthread_rwlock_unlock(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_unlock"); return 0; }
+long dummy_strerror_r(void) { debugPrintf("Called dummy: %s\n", "strerror_r"); return 0; }
+long dummy_sendmmsg(void) { debugPrintf("Called dummy: %s\n", "sendmmsg"); return 0; }
 long dummy_localeconv(void) { debugPrintf("Called dummy: %s\n", "localeconv"); return 0; }
 long dummy___open_2(void) { debugPrintf("Called dummy: %s\n", "__open_2"); return 0; }
-long dummy_basename(void) { debugPrintf("Called dummy: %s\n", "basename"); return 0; }
-long dummy_freelocale(void) { debugPrintf("Called dummy: %s\n", "freelocale"); return 0; }
-long dummy_sigaltstack(void) { debugPrintf("Called dummy: %s\n", "sigaltstack"); return 0; }
-long dummy_wcstod(void) { debugPrintf("Called dummy: %s\n", "wcstod"); return 0; }
-long dummy_sched_yield(void) { debugPrintf("Called dummy: %s\n", "sched_yield"); return 0; }
-long dummy_strtoull(void) { debugPrintf("Called dummy: %s\n", "strtoull"); return 0; }
-long dummy_getaddrinfo(void) { debugPrintf("Called dummy: %s\n", "getaddrinfo"); return 0; }
-long dummy_mbrlen(void) { debugPrintf("Called dummy: %s\n", "mbrlen"); return 0; }
-long dummy___write_chk(void) { debugPrintf("Called dummy: %s\n", "__write_chk"); return 0; }
-long dummy_strtoll(void) { debugPrintf("Called dummy: %s\n", "strtoll"); return 0; }
-long dummy_posix_memalign(void) { debugPrintf("Called dummy: %s\n", "posix_memalign"); return 0; }
-long dummy___memcpy_chk(void) { debugPrintf("Called dummy: %s\n", "__memcpy_chk"); return 0; }
-long dummy___poll_chk(void) { debugPrintf("Called dummy: %s\n", "__poll_chk"); return 0; }
-long dummy_stdout(void) { debugPrintf("Called dummy: %s\n", "stdout"); return 0; }
-long dummy_shutdown(void) { debugPrintf("Called dummy: %s\n", "shutdown"); return 0; }
-long dummy_getentropy(void) { debugPrintf("Called dummy: %s\n", "getentropy"); return 0; }
-long dummy_readdir(void) { debugPrintf("Called dummy: %s\n", "readdir"); return 0; }
-long dummy_eventfd(void) { debugPrintf("Called dummy: %s\n", "eventfd"); return 0; }
-long dummy_recvfrom(void) { debugPrintf("Called dummy: %s\n", "recvfrom"); return 0; }
-long dummy_inflateReset2(void) { debugPrintf("Called dummy: %s\n", "inflateReset2"); return 0; }
-long dummy_strtold_l(void) { debugPrintf("Called dummy: %s\n", "strtold_l"); return 0; }
-long dummy___strncpy_chk(void) { debugPrintf("Called dummy: %s\n", "__strncpy_chk"); return 0; }
-long dummy_stdin(void) { debugPrintf("Called dummy: %s\n", "stdin"); return 0; }
-long dummy_sigaction(void) { debugPrintf("Called dummy: %s\n", "sigaction"); return 0; }
-long dummy_sendmmsg(void) { debugPrintf("Called dummy: %s\n", "sendmmsg"); return 0; }
-long dummy_remove(void) { debugPrintf("Called dummy: %s\n", "remove"); return 0; }
-long dummy_memrchr(void) { debugPrintf("Called dummy: %s\n", "memrchr"); return 0; }
-long dummy_frexp(void) { debugPrintf("Called dummy: %s\n", "frexp"); return 0; }
-long dummy___strchr_chk(void) { debugPrintf("Called dummy: %s\n", "__strchr_chk"); return 0; }
-long dummy_unlink(void) { debugPrintf("Called dummy: %s\n", "unlink"); return 0; }
-long dummy_sendto(void) { debugPrintf("Called dummy: %s\n", "sendto"); return 0; }
-long dummy_strftime_l(void) { debugPrintf("Called dummy: %s\n", "strftime_l"); return 0; }
-long dummy_select(void) { debugPrintf("Called dummy: %s\n", "select"); return 0; }
-long dummy_iswspace_l(void) { debugPrintf("Called dummy: %s\n", "iswspace_l"); return 0; }
-long dummy_dlerror(void) { debugPrintf("Called dummy: %s\n", "dlerror"); return 0; }
-long dummy_inflateInit_(void) { debugPrintf("Called dummy: %s\n", "inflateInit_"); return 0; }
-long dummy_gmtime(void) { debugPrintf("Called dummy: %s\n", "gmtime"); return 0; }
-long dummy___memset_chk(void) { debugPrintf("Called dummy: %s\n", "__memset_chk"); return 0; }
-long dummy_wcscoll_l(void) { debugPrintf("Called dummy: %s\n", "wcscoll_l"); return 0; }
-long dummy___memmove_chk(void) { debugPrintf("Called dummy: %s\n", "__memmove_chk"); return 0; }
-long dummy_listen(void) { debugPrintf("Called dummy: %s\n", "listen"); return 0; }
-long dummy_recvmmsg(void) { debugPrintf("Called dummy: %s\n", "recvmmsg"); return 0; }
-long dummy_strdup(void) { debugPrintf("Called dummy: %s\n", "strdup"); return 0; }
-long dummy_pthread_equal(void) { debugPrintf("Called dummy: %s\n", "pthread_equal"); return 0; }
-int dummy_SL_IID_BUFFERQUEUE = 0;
-long dummy_freeifaddrs(void) { debugPrintf("Called dummy: %s\n", "freeifaddrs"); return 0; }
-long dummy_glIsRenderbuffer(void) { debugPrintf("Called dummy: %s\n", "glIsRenderbuffer"); return 0; }
 long dummy___strncpy_chk2(void) { debugPrintf("Called dummy: %s\n", "__strncpy_chk2"); return 0; }
-long dummy_strcoll_l(void) { debugPrintf("Called dummy: %s\n", "strcoll_l"); return 0; }
-long dummy_gmtime_r(void) { debugPrintf("Called dummy: %s\n", "gmtime_r"); return 0; }
-long dummy_getpeername(void) { debugPrintf("Called dummy: %s\n", "getpeername"); return 0; }
-long dummy_iswxdigit_l(void) { debugPrintf("Called dummy: %s\n", "iswxdigit_l"); return 0; }
-long dummy_strcspn(void) { debugPrintf("Called dummy: %s\n", "strcspn"); return 0; }
-long dummy_syslog(void) { debugPrintf("Called dummy: %s\n", "syslog"); return 0; }
-long dummy_mbsrtowcs(void) { debugPrintf("Called dummy: %s\n", "mbsrtowcs"); return 0; }
-long dummy_pthread_mutex_trylock(void) { debugPrintf("Called dummy: %s\n", "pthread_mutex_trylock"); return 0; }
-long dummy_iswalpha_l(void) { debugPrintf("Called dummy: %s\n", "iswalpha_l"); return 0; }
-long dummy_dl_iterate_phdr(void) { debugPrintf("Called dummy: %s\n", "dl_iterate_phdr"); return 0; }
-long dummy_glIsFramebuffer(void) { debugPrintf("Called dummy: %s\n", "glIsFramebuffer"); return 0; }
-long dummy_pthread_rwlock_rdlock(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_rdlock"); return 0; }
-long dummy_iswcntrl_l(void) { debugPrintf("Called dummy: %s\n", "iswcntrl_l"); return 0; }
-long dummy_socketpair(void) { debugPrintf("Called dummy: %s\n", "socketpair"); return 0; }
-long dummy_dlclose(void) { debugPrintf("Called dummy: %s\n", "dlclose"); return 0; }
-long dummy_wmemcmp(void) { debugPrintf("Called dummy: %s\n", "wmemcmp"); return 0; }
-long dummy_strtoull_l(void) { debugPrintf("Called dummy: %s\n", "strtoull_l"); return 0; }
-long dummy___ctype_get_mb_cur_max(void) { debugPrintf("Called dummy: %s\n", "__ctype_get_mb_cur_max"); return 0; }
-long dummy_dlsym(void) { debugPrintf("Called dummy: %s\n", "dlsym"); return 0; }
-long dummy_iswpunct_l(void) { debugPrintf("Called dummy: %s\n", "iswpunct_l"); return 0; }
-long dummy_setsockopt(void) { debugPrintf("Called dummy: %s\n", "setsockopt"); return 0; }
-long dummy_madvise(void) { debugPrintf("Called dummy: %s\n", "madvise"); return 0; }
-long dummy_sigemptyset(void) { debugPrintf("Called dummy: %s\n", "sigemptyset"); return 0; }
-long dummy_poll(void) { debugPrintf("Called dummy: %s\n", "poll"); return 0; }
-long dummy___memchr_chk(void) { debugPrintf("Called dummy: %s\n", "__memchr_chk"); return 0; }
-long dummy_fstat(void) { debugPrintf("Called dummy: %s\n", "fstat"); return 0; }
-long dummy___strcpy_chk(void) { debugPrintf("Called dummy: %s\n", "__strcpy_chk"); return 0; }
-long dummy_closelog(void) { debugPrintf("Called dummy: %s\n", "closelog"); return 0; }
-long dummy_munmap(void) { debugPrintf("Called dummy: %s\n", "munmap"); return 0; }
-long dummy_realpath(void) { debugPrintf("Called dummy: %s\n", "realpath"); return 0; }
-long dummy_atan(void) { debugPrintf("Called dummy: %s\n", "atan"); return 0; }
-long dummy_accept4(void) { debugPrintf("Called dummy: %s\n", "accept4"); return 0; }
-long dummy_getauxval(void) { debugPrintf("Called dummy: %s\n", "getauxval"); return 0; }
-long dummy_closedir(void) { debugPrintf("Called dummy: %s\n", "closedir"); return 0; }
-long dummy_longjmp(void) { debugPrintf("Called dummy: %s\n", "longjmp"); return 0; }
-long dummy_gethostbyname(void) { debugPrintf("Called dummy: %s\n", "gethostbyname"); return 0; }
-long dummy_getpwuid_r(void) { debugPrintf("Called dummy: %s\n", "getpwuid_r"); return 0; }
-long dummy_wcstold(void) { debugPrintf("Called dummy: %s\n", "wcstold"); return 0; }
-long dummy_getpid(void) { debugPrintf("Called dummy: %s\n", "getpid"); return 0; }
-long dummy_strspn(void) { debugPrintf("Called dummy: %s\n", "strspn"); return 0; }
-long dummy_ftello(void) { debugPrintf("Called dummy: %s\n", "ftello"); return 0; }
-long dummy_access(void) { debugPrintf("Called dummy: %s\n", "access"); return 0; }
-long dummy_getsockname(void) { debugPrintf("Called dummy: %s\n", "getsockname"); return 0; }
-long dummy_glValidateProgram(void) { debugPrintf("Called dummy: %s\n", "glValidateProgram"); return 0; }
-long dummy_android_set_abort_message(void) { debugPrintf("Called dummy: %s\n", "android_set_abort_message"); return 0; }
-long dummy_mbtowc(void) { debugPrintf("Called dummy: %s\n", "mbtowc"); return 0; }
-long dummy_pthread_rwlock_destroy(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_destroy"); return 0; }
-long dummy_mbsnrtowcs(void) { debugPrintf("Called dummy: %s\n", "mbsnrtowcs"); return 0; }
-long dummy_strxfrm_l(void) { debugPrintf("Called dummy: %s\n", "strxfrm_l"); return 0; }
-long dummy_strtold(void) { debugPrintf("Called dummy: %s\n", "strtold"); return 0; }
+long dummy___strncpy_chk(void) { debugPrintf("Called dummy: %s\n", "__strncpy_chk"); return 0; }
 long dummy_wcstoull(void) { debugPrintf("Called dummy: %s\n", "wcstoull"); return 0; }
-long dummy_swprintf(void) { debugPrintf("Called dummy: %s\n", "swprintf"); return 0; }
-long dummy_mlock(void) { debugPrintf("Called dummy: %s\n", "mlock"); return 0; }
-long dummy_bind(void) { debugPrintf("Called dummy: %s\n", "bind"); return 0; }
-long dummy_signal(void) { debugPrintf("Called dummy: %s\n", "signal"); return 0; }
-long dummy_socket(void) { debugPrintf("Called dummy: %s\n", "socket"); return 0; }
-long dummy_openlog(void) { debugPrintf("Called dummy: %s\n", "openlog"); return 0; }
-long dummy_iswdigit_l(void) { debugPrintf("Called dummy: %s\n", "iswdigit_l"); return 0; }
-long dummy___FD_SET_chk(void) { debugPrintf("Called dummy: %s\n", "__FD_SET_chk"); return 0; }
+long dummy_recvmmsg(void) { debugPrintf("Called dummy: %s\n", "recvmmsg"); return 0; }
 long dummy_strtoll_l(void) { debugPrintf("Called dummy: %s\n", "strtoll_l"); return 0; }
+long dummy_syscall(void) { debugPrintf("Called dummy: %s\n", "syscall"); return 0; }
+long dummy_android_set_abort_message(void) { debugPrintf("Called dummy: %s\n", "android_set_abort_message"); return 0; }
+long dummy___FD_SET_chk(void) { debugPrintf("Called dummy: %s\n", "__FD_SET_chk"); return 0; }
+long dummy_ioctl(void) { debugPrintf("Called dummy: %s\n", "ioctl"); return 0; }
+long dummy_iswspace_l(void) { debugPrintf("Called dummy: %s\n", "iswspace_l"); return 0; }
+long dummy___memcpy_chk(void) { debugPrintf("Called dummy: %s\n", "__memcpy_chk"); return 0; }
+long dummy_access(void) { debugPrintf("Called dummy: %s\n", "access"); return 0; }
+long dummy_strtold(void) { debugPrintf("Called dummy: %s\n", "strtold"); return 0; }
+long dummy_gethostbyname(void) { debugPrintf("Called dummy: %s\n", "gethostbyname"); return 0; }
+long dummy___fwrite_chk(void) { debugPrintf("Called dummy: %s\n", "__fwrite_chk"); return 0; }
+long dummy___memchr_chk(void) { debugPrintf("Called dummy: %s\n", "__memchr_chk"); return 0; }
+int dummy_SL_IID_PLAY = 0;
+long dummy_strtold_l(void) { debugPrintf("Called dummy: %s\n", "strtold_l"); return 0; }
+long dummy_mbsnrtowcs(void) { debugPrintf("Called dummy: %s\n", "mbsnrtowcs"); return 0; }
 long dummy___cxa_finalize(void) { debugPrintf("Called dummy: %s\n", "__cxa_finalize"); return 0; }
+long dummy_mlock(void) { debugPrintf("Called dummy: %s\n", "mlock"); return 0; }
+long dummy_sched_yield(void) { debugPrintf("Called dummy: %s\n", "sched_yield"); return 0; }
+long dummy_freeifaddrs(void) { debugPrintf("Called dummy: %s\n", "freeifaddrs"); return 0; }
+long dummy_wmemchr(void) { debugPrintf("Called dummy: %s\n", "wmemchr"); return 0; }
+long dummy_vfprintf(void) { debugPrintf("Called dummy: %s\n", "vfprintf"); return 0; }
+long dummy___cmsg_nxthdr(void) { debugPrintf("Called dummy: %s\n", "__cmsg_nxthdr"); return 0; }
+long dummy_syslog(void) { debugPrintf("Called dummy: %s\n", "syslog"); return 0; }
+long dummy___ctype_get_mb_cur_max(void) { debugPrintf("Called dummy: %s\n", "__ctype_get_mb_cur_max"); return 0; }
+long dummy_gai_strerror(void) { debugPrintf("Called dummy: %s\n", "gai_strerror"); return 0; }
+long dummy_wcstol(void) { debugPrintf("Called dummy: %s\n", "wcstol"); return 0; }
+long dummy_pthread_rwlock_init(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_init"); return 0; }
+long dummy_getpeername(void) { debugPrintf("Called dummy: %s\n", "getpeername"); return 0; }
+long dummy_freelocale(void) { debugPrintf("Called dummy: %s\n", "freelocale"); return 0; }
+long dummy___poll_chk(void) { debugPrintf("Called dummy: %s\n", "__poll_chk"); return 0; }
+long dummy_wcstold(void) { debugPrintf("Called dummy: %s\n", "wcstold"); return 0; }
+long dummy_longjmp(void) { debugPrintf("Called dummy: %s\n", "longjmp"); return 0; }
+long dummy___stack_chk_fail(void) { debugPrintf("Called dummy: %s\n", "__stack_chk_fail"); return 0; }
+long dummy_newlocale(void) { debugPrintf("Called dummy: %s\n", "newlocale"); return 0; }
+long dummy_pthread_attr_destroy(void) { debugPrintf("Called dummy: %s\n", "pthread_attr_destroy"); return 0; }
+int dummy_SL_IID_VOLUME = 0;
+long dummy_mbtowc(void) { debugPrintf("Called dummy: %s\n", "mbtowc"); return 0; }
+long dummy_rename(void) { debugPrintf("Called dummy: %s\n", "rename"); return 0; }
+long dummy_mktime(void) { debugPrintf("Called dummy: %s\n", "mktime"); return 0; }
+long dummy___strlen_chk(void) { debugPrintf("Called dummy: %s\n", "__strlen_chk"); return 0; }
+long dummy_setsockopt(void) { debugPrintf("Called dummy: %s\n", "setsockopt"); return 0; }
+long dummy_getentropy(void) { debugPrintf("Called dummy: %s\n", "getentropy"); return 0; }
+long dummy_madvise(void) { debugPrintf("Called dummy: %s\n", "madvise"); return 0; }
+long dummy_strcoll_l(void) { debugPrintf("Called dummy: %s\n", "strcoll_l"); return 0; }
+long dummy_dlerror(void) { debugPrintf("Called dummy: %s\n", "dlerror"); return 0; }
+long dummy_dlopen(void) { debugPrintf("Called dummy: %s\n", "dlopen"); return 0; }
+long dummy_wcsxfrm_l(void) { debugPrintf("Called dummy: %s\n", "wcsxfrm_l"); return 0; }
+long dummy_dl_iterate_phdr(void) { debugPrintf("Called dummy: %s\n", "dl_iterate_phdr"); return 0; }
+long dummy___vsnprintf_chk(void) { debugPrintf("Called dummy: %s\n", "__vsnprintf_chk"); return 0; }
+long dummy_dlclose(void) { debugPrintf("Called dummy: %s\n", "dlclose"); return 0; }
+long dummy_dlsym(void) { debugPrintf("Called dummy: %s\n", "dlsym"); return 0; }
+long dummy_uselocale(void) { debugPrintf("Called dummy: %s\n", "uselocale"); return 0; }
+long dummy_strtoull(void) { debugPrintf("Called dummy: %s\n", "strtoull"); return 0; }
+long dummy_inflateReset(void) { debugPrintf("Called dummy: %s\n", "inflateReset"); return 0; }
+long dummy_strspn(void) { debugPrintf("Called dummy: %s\n", "strspn"); return 0; }
+long dummy_inet_ntop(void) { debugPrintf("Called dummy: %s\n", "inet_ntop"); return 0; }
+long dummy_ftello(void) { debugPrintf("Called dummy: %s\n", "ftello"); return 0; }
+long dummy___vsprintf_chk(void) { debugPrintf("Called dummy: %s\n", "__vsprintf_chk"); return 0; }
 long dummy_sincosf(void) { debugPrintf("Called dummy: %s\n", "sincosf"); return 0; }
-long dummy_pipe(void) { debugPrintf("Called dummy: %s\n", "pipe"); return 0; }
+long dummy_wcscoll_l(void) { debugPrintf("Called dummy: %s\n", "wcscoll_l"); return 0; }
+long dummy_eventfd(void) { debugPrintf("Called dummy: %s\n", "eventfd"); return 0; }
+long dummy_getifaddrs(void) { debugPrintf("Called dummy: %s\n", "getifaddrs"); return 0; }
+long dummy_wcstof(void) { debugPrintf("Called dummy: %s\n", "wcstof"); return 0; }
+long dummy_tmpnam(void) { debugPrintf("Called dummy: %s\n", "tmpnam"); return 0; }
+long dummy_strtoll(void) { debugPrintf("Called dummy: %s\n", "strtoll"); return 0; }
+long dummy___fread_chk(void) { debugPrintf("Called dummy: %s\n", "__fread_chk"); return 0; }
+long dummy_wcstoul(void) { debugPrintf("Called dummy: %s\n", "wcstoul"); return 0; }
+long dummy_inflateInit_(void) { debugPrintf("Called dummy: %s\n", "inflateInit_"); return 0; }
+long dummy_socketpair(void) { debugPrintf("Called dummy: %s\n", "socketpair"); return 0; }
+long dummy_strxfrm_l(void) { debugPrintf("Called dummy: %s\n", "strxfrm_l"); return 0; }
+long dummy___strcpy_chk(void) { debugPrintf("Called dummy: %s\n", "__strcpy_chk"); return 0; }
+long dummy_pthread_rwlock_destroy(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_destroy"); return 0; }
+long dummy_mbsrtowcs(void) { debugPrintf("Called dummy: %s\n", "mbsrtowcs"); return 0; }
+long dummy_towlower_l(void) { debugPrintf("Called dummy: %s\n", "towlower_l"); return 0; }
+long dummy_iswalpha_l(void) { debugPrintf("Called dummy: %s\n", "iswalpha_l"); return 0; }
+long dummy_iswprint_l(void) { debugPrintf("Called dummy: %s\n", "iswprint_l"); return 0; }
+long dummy_openlog(void) { debugPrintf("Called dummy: %s\n", "openlog"); return 0; }
+int dummy_SL_IID_ENGINE = 0;
+long dummy_posix_memalign(void) { debugPrintf("Called dummy: %s\n", "posix_memalign"); return 0; }
 long dummy_pthread_attr_setdetachstate(void) { debugPrintf("Called dummy: %s\n", "pthread_attr_setdetachstate"); return 0; }
+long dummy_getpwuid_r(void) { debugPrintf("Called dummy: %s\n", "getpwuid_r"); return 0; }
 long dummy_getsockopt(void) { debugPrintf("Called dummy: %s\n", "getsockopt"); return 0; }
 long dummy_getnameinfo(void) { debugPrintf("Called dummy: %s\n", "getnameinfo"); return 0; }
-long dummy___read_chk(void) { debugPrintf("Called dummy: %s\n", "__read_chk"); return 0; }
-long dummy_modf(void) { debugPrintf("Called dummy: %s\n", "modf"); return 0; }
-long dummy_connect(void) { debugPrintf("Called dummy: %s\n", "connect"); return 0; }
-long dummy___fwrite_chk(void) { debugPrintf("Called dummy: %s\n", "__fwrite_chk"); return 0; }
-long dummy_fseeko(void) { debugPrintf("Called dummy: %s\n", "fseeko"); return 0; }
-long dummy_strerror_r(void) { debugPrintf("Called dummy: %s\n", "strerror_r"); return 0; }
-long dummy_towlower_l(void) { debugPrintf("Called dummy: %s\n", "towlower_l"); return 0; }
-long dummy_pthread_exit(void) { debugPrintf("Called dummy: %s\n", "pthread_exit"); return 0; }
-long dummy_sysconf(void) { debugPrintf("Called dummy: %s\n", "sysconf"); return 0; }
-long dummy___system_property_get(void) { debugPrintf("Called dummy: %s\n", "__system_property_get"); return 0; }
-long dummy_setlocale(void) { debugPrintf("Called dummy: %s\n", "setlocale"); return 0; }
-int dummy_SL_IID_ENGINE = 0;
-long dummy_iswlower_l(void) { debugPrintf("Called dummy: %s\n", "iswlower_l"); return 0; }
-long dummy_wcstof(void) { debugPrintf("Called dummy: %s\n", "wcstof"); return 0; }
-long dummy_newlocale(void) { debugPrintf("Called dummy: %s\n", "newlocale"); return 0; }
-long dummy___vsnprintf_chk(void) { debugPrintf("Called dummy: %s\n", "__vsnprintf_chk"); return 0; }
-long dummy_pthread_attr_init(void) { debugPrintf("Called dummy: %s\n", "pthread_attr_init"); return 0; }
-long dummy_getifaddrs(void) { debugPrintf("Called dummy: %s\n", "getifaddrs"); return 0; }
 long dummy___cxa_atexit(void) { debugPrintf("Called dummy: %s\n", "__cxa_atexit"); return 0; }
-long dummy_uselocale(void) { debugPrintf("Called dummy: %s\n", "uselocale"); return 0; }
-long dummy_if_nametoindex(void) { debugPrintf("Called dummy: %s\n", "if_nametoindex"); return 0; }
-long dummy_mktime(void) { debugPrintf("Called dummy: %s\n", "mktime"); return 0; }
-long dummy_syscall(void) { debugPrintf("Called dummy: %s\n", "syscall"); return 0; }
-long dummy_stderr(void) { debugPrintf("Called dummy: %s\n", "stderr"); return 0; }
-long dummy_vsscanf(void) { debugPrintf("Called dummy: %s\n", "vsscanf"); return 0; }
-long dummy_mmap(void) { debugPrintf("Called dummy: %s\n", "mmap"); return 0; }
-long dummy___strlen_chk(void) { debugPrintf("Called dummy: %s\n", "__strlen_chk"); return 0; }
-long dummy_deflateReset(void) { debugPrintf("Called dummy: %s\n", "deflateReset"); return 0; }
-long dummy_gai_strerror(void) { debugPrintf("Called dummy: %s\n", "gai_strerror"); return 0; }
-long dummy_pthread_detach(void) { debugPrintf("Called dummy: %s\n", "pthread_detach"); return 0; }
-long dummy_pthread_rwlock_unlock(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_unlock"); return 0; }
-long dummy_rename(void) { debugPrintf("Called dummy: %s\n", "rename"); return 0; }
-long dummy_freeaddrinfo(void) { debugPrintf("Called dummy: %s\n", "freeaddrinfo"); return 0; }
+long dummy_inflateReset2(void) { debugPrintf("Called dummy: %s\n", "inflateReset2"); return 0; }
+long dummy_closelog(void) { debugPrintf("Called dummy: %s\n", "closelog"); return 0; }
+long dummy_strtoull_l(void) { debugPrintf("Called dummy: %s\n", "strtoull_l"); return 0; }
+long dummy_iswblank_l(void) { debugPrintf("Called dummy: %s\n", "iswblank_l"); return 0; }
+long dummy_strptime(void) { debugPrintf("Called dummy: %s\n", "strptime"); return 0; }
 long dummy___register_atfork(void) { debugPrintf("Called dummy: %s\n", "__register_atfork"); return 0; }
-long dummy_pthread_attr_destroy(void) { debugPrintf("Called dummy: %s\n", "pthread_attr_destroy"); return 0; }
+long dummy_freeaddrinfo(void) { debugPrintf("Called dummy: %s\n", "freeaddrinfo"); return 0; }
+long dummy_slCreateEngine(void) { debugPrintf("Called dummy: %s\n", "slCreateEngine"); return 0; }
+long dummy_wcstod(void) { debugPrintf("Called dummy: %s\n", "wcstod"); return 0; }
+long dummy_pthread_rwlock_wrlock(void) { debugPrintf("Called dummy: %s\n", "pthread_rwlock_wrlock"); return 0; }
+long dummy_iswlower_l(void) { debugPrintf("Called dummy: %s\n", "iswlower_l"); return 0; }
+long dummy_iswpunct_l(void) { debugPrintf("Called dummy: %s\n", "iswpunct_l"); return 0; }
+long dummy_mbrlen(void) { debugPrintf("Called dummy: %s\n", "mbrlen"); return 0; }
+long dummy_strcspn(void) { debugPrintf("Called dummy: %s\n", "strcspn"); return 0; }
+long dummy_wmemcmp(void) { debugPrintf("Called dummy: %s\n", "wmemcmp"); return 0; }
+int* dummy___errno(void) { static int e=0; return &e; }
+long dummy_getauxval(void) { debugPrintf("Called dummy: %s\n", "getauxval"); return 0; }
+long dummy_remove(void) { debugPrintf("Called dummy: %s\n", "remove"); return 0; }
+long dummy_accept4(void) { debugPrintf("Called dummy: %s\n", "accept4"); return 0; }
+long dummy_modf(void) { debugPrintf("Called dummy: %s\n", "modf"); return 0; }
+long dummy_iswupper_l(void) { debugPrintf("Called dummy: %s\n", "iswupper_l"); return 0; }
+long dummy_if_nametoindex(void) { debugPrintf("Called dummy: %s\n", "if_nametoindex"); return 0; }
+long dummy_memrchr(void) { debugPrintf("Called dummy: %s\n", "memrchr"); return 0; }
+long dummy_atan(void) { debugPrintf("Called dummy: %s\n", "atan"); return 0; }
+long dummy_pthread_detach(void) { debugPrintf("Called dummy: %s\n", "pthread_detach"); return 0; }
+long dummy_pthread_exit(void) { debugPrintf("Called dummy: %s\n", "pthread_exit"); return 0; }
+long dummy_sigaltstack(void) { debugPrintf("Called dummy: %s\n", "sigaltstack"); return 0; }
+long dummy_pthread_mutex_trylock(void) { debugPrintf("Called dummy: %s\n", "pthread_mutex_trylock"); return 0; }
+long dummy_strftime_l(void) { debugPrintf("Called dummy: %s\n", "strftime_l"); return 0; }
+long dummy_wcsnrtombs(void) { debugPrintf("Called dummy: %s\n", "wcsnrtombs"); return 0; }
+long dummy___strchr_chk(void) { debugPrintf("Called dummy: %s\n", "__strchr_chk"); return 0; }
+long dummy_inet_pton(void) { debugPrintf("Called dummy: %s\n", "inet_pton"); return 0; }
+long dummy___memset_chk(void) { debugPrintf("Called dummy: %s\n", "__memset_chk"); return 0; }
+long dummy_pthread_equal(void) { debugPrintf("Called dummy: %s\n", "pthread_equal"); return 0; }
+long dummy_deflateReset(void) { debugPrintf("Called dummy: %s\n", "deflateReset"); return 0; }
 int dummy_SL_IID_SEEK = 0;
-
-
-
-#include <stdlib.h>
-#include <ctype.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <sys/time.h>
-#include "opensles_shim.h"
-#include "android_shim.h"
-#include "egl_shim.h"
-
-#include <stdio.h>
-
-#include <stdarg.h>
-int __android_log_print(int prio, const char* tag, const char* fmt, ...) {
-    va_list ap;
-    va_start(ap, fmt);
-    vprintf(fmt, ap);
-    printf("\n");
-    va_end(ap);
-    return 1;
-}
-int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap) {
-    vprintf(fmt, ap);
-    printf("\n");
-    return 1;
-}
-int __android_log_write(int prio, const char* tag, const char* text) {
-    printf("%s\n", text);
-    return 1;
-}
-
-
-
-#include <zlib.h>
-extern void *__stack_chk_guard;
-void __stack_chk_fail(void);
-// GLES prototypes to fix undeclared functions
-#include <GLES2/gl2.h>
-
-
-#include <stdint.h>
-#include <assert.h>
-#include <errno.h>
-
-static uint8_t fake_sF[3][0x100];
-
-void __assert2(const char *file, int line, const char *func, const char *expr) {
-    printf("assertion failed:\n%s:%d (%s): %s\n", file, line, func, expr);
-    assert(0);
-}
+long dummy_iswdigit_l(void) { debugPrintf("Called dummy: %s\n", "iswdigit_l"); return 0; }
+int dummy_SL_IID_BUFFERQUEUE = 0;
+long dummy_getaddrinfo(void) { debugPrintf("Called dummy: %s\n", "getaddrinfo"); return 0; }
+long dummy_gmtime_r(void) { debugPrintf("Called dummy: %s\n", "gmtime_r"); return 0; }
+long dummy_iswcntrl_l(void) { debugPrintf("Called dummy: %s\n", "iswcntrl_l"); return 0; }
+long dummy_fseeko(void) { debugPrintf("Called dummy: %s\n", "fseeko"); return 0; }
+long dummy___system_property_get(void) { debugPrintf("Called dummy: %s\n", "__system_property_get"); return 0; }
+long dummy_wcstoll(void) { debugPrintf("Called dummy: %s\n", "wcstoll"); return 0; }
 
 // Outras funcões faltantes
 #include <math.h>
@@ -537,156 +469,410 @@ DynLibFunction dynlib_functions[] = {
   {"glValidateProgram", (uintptr_t)&dummy_glValidateProgram},
   {"atan", (uintptr_t)&dummy_atan},
   {"AAsset_openFileDescriptor", (uintptr_t)&fake_AAsset_openFileDescriptor},
-  {"__memmove_chk", (uintptr_t)&dummy___memmove_chk},
-  {"AInputQueue_detachLooper", (uintptr_t)&ret0},
-  {"AInputQueue_attachLooper", (uintptr_t)&ret0},
-  {"pipe", (uintptr_t)&dummy_pipe},
-  {"pthread_attr_init", (uintptr_t)&dummy_pthread_attr_init},
-  {"pthread_attr_setdetachstate", (uintptr_t)&dummy_pthread_attr_setdetachstate},
-  {"ALooper_prepare", (uintptr_t)&ret0},
-  {"ALooper_addFd", (uintptr_t)&ret0},
-  {"AInputQueue_finishEvent", (uintptr_t)&ret0},
-  {"AInputQueue_getEvent", (uintptr_t)&ret0},
-  {"AInputQueue_preDispatchEvent", (uintptr_t)&ret0},
-  {"inflateReset", (uintptr_t)&dummy_inflateReset},
-  {"deflateReset", (uintptr_t)&dummy_deflateReset},
-  {"inflateReset2", (uintptr_t)&dummy_inflateReset2},
-  {"getsockopt", (uintptr_t)&dummy_getsockopt},
-  {"gethostbyname", (uintptr_t)&dummy_gethostbyname},
-  {"ioctl", (uintptr_t)&dummy_ioctl},
-  {"setsockopt", (uintptr_t)&dummy_setsockopt},
-  {"getsockname", (uintptr_t)&dummy_getsockname},
-  {"poll", (uintptr_t)&dummy_poll},
-  {"getnameinfo", (uintptr_t)&dummy_getnameinfo},
-  {"gai_strerror", (uintptr_t)&dummy_gai_strerror},
-  {"freeaddrinfo", (uintptr_t)&dummy_freeaddrinfo},
-  {"getaddrinfo", (uintptr_t)&dummy_getaddrinfo},
-  {"socket", (uintptr_t)&dummy_socket},
-  {"connect", (uintptr_t)&dummy_connect},
-  {"bind", (uintptr_t)&dummy_bind},
-  {"listen", (uintptr_t)&dummy_listen},
-  {"accept", (uintptr_t)&dummy_accept},
-  {"__write_chk", (uintptr_t)&dummy___write_chk},
+  {"__DynLibFunction dynlib_functions[] = {
+  {"glBindTexture", (uintptr_t)&glBindTexture},
+  {"ferror", (uintptr_t)&ferror},
   {"__read_chk", (uintptr_t)&dummy___read_chk},
-  {"__memset_chk", (uintptr_t)&dummy___memset_chk},
-  {"getauxval", (uintptr_t)&dummy_getauxval},
-  {"dlerror", (uintptr_t)&dummy_dlerror},
-  {"vfprintf", (uintptr_t)&dummy_vfprintf},
-  {"sysconf", (uintptr_t)&dummy_sysconf},
-  {"mmap", (uintptr_t)&dummy_mmap},
-  {"mprotect", (uintptr_t)&dummy_mprotect},
-  {"syscall", (uintptr_t)&dummy_syscall},
-  {"mlock", (uintptr_t)&dummy_mlock},
-  {"madvise", (uintptr_t)&dummy_madvise},
-  {"munmap", (uintptr_t)&dummy_munmap},
-  {"readdir", (uintptr_t)&dummy_readdir},
-  {"opendir", (uintptr_t)&dummy_opendir},
-  {"closedir", (uintptr_t)&dummy_closedir},
-  {"gmtime_r", (uintptr_t)&dummy_gmtime_r},
-  {"pthread_rwlock_init", (uintptr_t)&dummy_pthread_rwlock_init},
-  {"pthread_rwlock_rdlock", (uintptr_t)&dummy_pthread_rwlock_rdlock},
-  {"pthread_rwlock_wrlock", (uintptr_t)&dummy_pthread_rwlock_wrlock},
-  {"pthread_rwlock_unlock", (uintptr_t)&dummy_pthread_rwlock_unlock},
-  {"pthread_rwlock_destroy", (uintptr_t)&dummy_pthread_rwlock_destroy},
-  {"pthread_equal", (uintptr_t)&dummy_pthread_equal},
-  {"getpid", (uintptr_t)&dummy_getpid},
-  {"pthread_attr_destroy", (uintptr_t)&dummy_pthread_attr_destroy},
-  {"pthread_exit", (uintptr_t)&dummy_pthread_exit},
-  {"pthread_mutex_trylock", (uintptr_t)&dummy_pthread_mutex_trylock},
-  {"fileno", (uintptr_t)&dummy_fileno},
-  {"signal", (uintptr_t)&dummy_signal},
-  {"__strncpy_chk", (uintptr_t)&dummy___strncpy_chk},
-  {"shutdown", (uintptr_t)&dummy_shutdown},
-  {"sendto", (uintptr_t)&dummy_sendto},
-  {"recvfrom", (uintptr_t)&dummy_recvfrom},
-  {"getpeername", (uintptr_t)&dummy_getpeername},
-  {"sendmmsg", (uintptr_t)&dummy_sendmmsg},
-  {"recvmmsg", (uintptr_t)&dummy_recvmmsg},
-  {"__cmsg_nxthdr", (uintptr_t)&dummy___cmsg_nxthdr},
-  {"fstat", (uintptr_t)&dummy_fstat},
-  {"__open_2", (uintptr_t)&dummy___open_2},
-  {"__fwrite_chk", (uintptr_t)&dummy___fwrite_chk},
-  {"accept4", (uintptr_t)&dummy_accept4},
-  {"inet_pton", (uintptr_t)&dummy_inet_pton},
-  {"inet_ntop", (uintptr_t)&dummy_inet_ntop},
-  {"__FD_SET_chk", (uintptr_t)&dummy___FD_SET_chk},
-  {"pthread_detach", (uintptr_t)&dummy_pthread_detach},
-  {"unlink", (uintptr_t)&dummy_unlink},
-  {"memrchr", (uintptr_t)&dummy_memrchr},
-  {"fseeko", (uintptr_t)&dummy_fseeko},
-  {"getifaddrs", (uintptr_t)&dummy_getifaddrs},
-  {"freeifaddrs", (uintptr_t)&dummy_freeifaddrs},
-  {"basename", (uintptr_t)&dummy_basename},
+  {"glFrontFace", (uintptr_t)&glFrontFace},
+  {"glDisable", (uintptr_t)&glDisable},
+  {"__write_chk", (uintptr_t)&dummy___write_chk},
+  {"wcrtomb", (uintptr_t)&wcrtomb},
   {"geteuid", (uintptr_t)&dummy_geteuid},
-  {"getpwuid_r", (uintptr_t)&dummy_getpwuid_r},
-  {"eventfd", (uintptr_t)&dummy_eventfd},
-  {"socketpair", (uintptr_t)&dummy_socketpair},
-  {"strerror_r", (uintptr_t)&dummy_strerror_r},
-  {"if_nametoindex", (uintptr_t)&dummy_if_nametoindex},
-  {"__fread_chk", (uintptr_t)&dummy___fread_chk},
-  {"__memchr_chk", (uintptr_t)&dummy___memchr_chk},
-  {"__poll_chk", (uintptr_t)&dummy___poll_chk},
-  {"realpath", (uintptr_t)&dummy_realpath},
-  {"fcntl", (uintptr_t)&dummy_fcntl},
-  {"select", (uintptr_t)&dummy_select},
-  {"frexp", (uintptr_t)&dummy_frexp},
-  {"gmtime", (uintptr_t)&dummy_gmtime},
-  {"__strcpy_chk", (uintptr_t)&dummy___strcpy_chk},
-  {"strtoll", (uintptr_t)&dummy_strtoll},
-  {"strtoull", (uintptr_t)&dummy_strtoull},
-  {"sched_yield", (uintptr_t)&dummy_sched_yield},
-  {"wmemchr", (uintptr_t)&dummy_wmemchr},
-  {"wmemcmp", (uintptr_t)&dummy_wmemcmp},
-  {"strtold", (uintptr_t)&dummy_strtold},
-  {"wcstol", (uintptr_t)&dummy_wcstol},
-  {"wcstoul", (uintptr_t)&dummy_wcstoul},
-  {"wcstoll", (uintptr_t)&dummy_wcstoll},
-  {"wcstoull", (uintptr_t)&dummy_wcstoull},
-  {"wcstof", (uintptr_t)&dummy_wcstof},
-  {"wcstod", (uintptr_t)&dummy_wcstod},
-  {"wcstold", (uintptr_t)&dummy_wcstold},
-  {"swprintf", (uintptr_t)&dummy_swprintf},
-  {"ftello", (uintptr_t)&dummy_ftello},
-  {"newlocale", (uintptr_t)&dummy_newlocale},
-  {"uselocale", (uintptr_t)&dummy_uselocale},
-  {"vsscanf", (uintptr_t)&dummy_vsscanf},
-  {"strftime_l", (uintptr_t)&dummy_strftime_l},
-  {"mbsrtowcs", (uintptr_t)&dummy_mbsrtowcs},
-  {"vasprintf", (uintptr_t)&dummy_vasprintf},
-  {"setlocale", (uintptr_t)&dummy_setlocale},
-  {"freelocale", (uintptr_t)&dummy_freelocale},
-  {"strcoll_l", (uintptr_t)&dummy_strcoll_l},
-  {"strxfrm_l", (uintptr_t)&dummy_strxfrm_l},
-  {"wcscoll_l", (uintptr_t)&dummy_wcscoll_l},
-  {"wcsxfrm_l", (uintptr_t)&dummy_wcsxfrm_l},
-  {"iswlower_l", (uintptr_t)&dummy_iswlower_l},
-  {"iswspace_l", (uintptr_t)&dummy_iswspace_l},
-  {"iswprint_l", (uintptr_t)&dummy_iswprint_l},
-  {"iswblank_l", (uintptr_t)&dummy_iswblank_l},
-  {"iswcntrl_l", (uintptr_t)&dummy_iswcntrl_l},
-  {"iswupper_l", (uintptr_t)&dummy_iswupper_l},
-  {"iswalpha_l", (uintptr_t)&dummy_iswalpha_l},
-  {"iswdigit_l", (uintptr_t)&dummy_iswdigit_l},
-  {"iswpunct_l", (uintptr_t)&dummy_iswpunct_l},
   {"iswxdigit_l", (uintptr_t)&dummy_iswxdigit_l},
-  {"towupper_l", (uintptr_t)&dummy_towupper_l},
-  {"towlower_l", (uintptr_t)&dummy_towlower_l},
-  {"wcsnrtombs", (uintptr_t)&dummy_wcsnrtombs},
-  {"mbsnrtowcs", (uintptr_t)&dummy_mbsnrtowcs},
-  {"mbtowc", (uintptr_t)&dummy_mbtowc},
-  {"__ctype_get_mb_cur_max", (uintptr_t)&dummy___ctype_get_mb_cur_max},
-  {"mbrlen", (uintptr_t)&dummy_mbrlen},
+  {"pthread_rwlock_unlock", (uintptr_t)&dummy_pthread_rwlock_unlock},
+  {"strerror_r", (uintptr_t)&dummy_strerror_r},
+  {"strstr", (uintptr_t)&strstr},
+  {"opendir", (uintptr_t)&opendir},
+  {"AConfiguration_getDensity", (uintptr_t)&ret0},
+  {"pthread_mutex_lock", (uintptr_t)&pthread_mutex_lock},
+  {"recvmmsg", (uintptr_t)&dummy_recvmmsg},
   {"strtoll_l", (uintptr_t)&dummy_strtoll_l},
-  {"strtoull_l", (uintptr_t)&dummy_strtoull_l},
-  {"strtold_l", (uintptr_t)&dummy_strtold_l},
+  {"glAttachShader", (uintptr_t)&glAttachShader},
   {"android_set_abort_message", (uintptr_t)&dummy_android_set_abort_message},
-  {"openlog", (uintptr_t)&dummy_openlog},
+  {"ioctl", (uintptr_t)&dummy_ioctl},
+  {"AInputEvent_getType", (uintptr_t)&ret0},
+  {"calloc", (uintptr_t)&calloc},
+  {"gethostbyname", (uintptr_t)&dummy_gethostbyname},
+  {"mlock", (uintptr_t)&dummy_mlock},
+  {"pthread_mutexattr_destroy", (uintptr_t)&pthread_mutexattr_destroy},
   {"syslog", (uintptr_t)&dummy_syslog},
-  {"closelog", (uintptr_t)&dummy_closelog},
+  {"AConfiguration_getScreenSize", (uintptr_t)&ret0},
+  {"pthread_self", (uintptr_t)&pthread_self},
+  {"wcstol", (uintptr_t)&dummy_wcstol},
+  {"pthread_rwlock_init", (uintptr_t)&dummy_pthread_rwlock_init},
+  {"ALooper_pollOnce", (uintptr_t)&ret0},
+  {"pthread_mutex_destroy", (uintptr_t)&pthread_mutex_destroy},
+  {"lseek", (uintptr_t)&lseek},
+  {"pthread_attr_destroy", (uintptr_t)&dummy_pthread_attr_destroy},
+  {"strdup", (uintptr_t)&strdup},
+  {"AAsset_seek", (uintptr_t)&fake_AAsset_seek},
+  {"glDepthMask", (uintptr_t)&glDepthMask},
+  {"realloc", (uintptr_t)&realloc},
+  {"glGetShaderInfoLog", (uintptr_t)&glGetShaderInfoLog},
+  {"setjmp", (uintptr_t)&setjmp},
+  {"dlopen", (uintptr_t)&dummy_dlopen},
+  {"dlclose", (uintptr_t)&dummy_dlclose},
+  {"setlocale", (uintptr_t)&setlocale},
+  {"dlsym", (uintptr_t)&dummy_dlsym},
+  {"strtoull", (uintptr_t)&dummy_strtoull},
+  {"socket", (uintptr_t)&socket},
+  {"AMotionEvent_getPointerCount", (uintptr_t)&ret0},
+  {"pthread_once", (uintptr_t)&pthread_once},
+  {"AConfiguration_getCountry", (uintptr_t)&ret0},
+  {"glClearDepthf", (uintptr_t)&glClearDepthf},
+  {"AAsset_getRemainingLength", (uintptr_t)&fake_AAsset_getRemainingLength},
+  {"printf", (uintptr_t)&printf},
+  {"stdout", (uintptr_t)&stdout},
+  {"pthread_mutex_unlock", (uintptr_t)&pthread_mutex_unlock},
+  {"AConfiguration_getScreenLong", (uintptr_t)&ret0},
+  {"wcscoll_l", (uintptr_t)&dummy_wcscoll_l},
+  {"glClear", (uintptr_t)&glClear},
+  {"wcstof", (uintptr_t)&dummy_wcstof},
+  {"tmpnam", (uintptr_t)&dummy_tmpnam},
+  {"sigemptyset", (uintptr_t)&sigemptyset},
+  {"AKeyEvent_getAction", (uintptr_t)&ret0},
+  {"sinf", (uintptr_t)&sinf},
+  {"strtod", (uintptr_t)&strtod},
+  {"rand", (uintptr_t)&rand},
+  {"pthread_rwlock_destroy", (uintptr_t)&dummy_pthread_rwlock_destroy},
+  {"SL_IID_ENGINE", (uintptr_t)&dummy_SL_IID_ENGINE},
+  {"pthread_cond_destroy", (uintptr_t)&pthread_cond_destroy},
+  {"pthread_attr_setdetachstate", (uintptr_t)&dummy_pthread_attr_setdetachstate},
+  {"getsockopt", (uintptr_t)&dummy_getsockopt},
+  {"fcntl", (uintptr_t)&fcntl},
+  {"pipe", (uintptr_t)&pipe},
+  {"getnameinfo", (uintptr_t)&dummy_getnameinfo},
+  {"fseek", (uintptr_t)&fseek},
+  {"inflateReset2", (uintptr_t)&dummy_inflateReset2},
+  {"strtol", (uintptr_t)&strtol},
+  {"fclose", (uintptr_t)&fclose},
+  {"strptime", (uintptr_t)&dummy_strptime},
+  {"__register_atfork", (uintptr_t)&dummy___register_atfork},
+  {"__android_log_print", (uintptr_t)&__android_log_print},
+  {"wcstod", (uintptr_t)&dummy_wcstod},
+  {"pthread_rwlock_wrlock", (uintptr_t)&dummy_pthread_rwlock_wrlock},
+  {"deflateEnd", (uintptr_t)&deflateEnd},
+  {"iswlower_l", (uintptr_t)&dummy_iswlower_l},
+  {"AInputQueue_preDispatchEvent", (uintptr_t)&ret0},
+  {"glGetIntegerv", (uintptr_t)&glGetIntegerv},
+  {"eglGetError", (uintptr_t)&egl_shim_GetError},
+  {"glDepthFunc", (uintptr_t)&glDepthFunc},
+  {"strcspn", (uintptr_t)&dummy_strcspn},
+  {"memchr", (uintptr_t)&memchr},
+  {"listen", (uintptr_t)&listen},
+  {"glVertexAttribPointer", (uintptr_t)&glVertexAttribPointer},
+  {"strchr", (uintptr_t)&strchr},
+  {"mbrtowc", (uintptr_t)&mbrtowc},
+  {"AInputEvent_getSource", (uintptr_t)&ret0},
+  {"eglSwapBuffers", (uintptr_t)&egl_shim_SwapBuffers},
+  {"pthread_detach", (uintptr_t)&dummy_pthread_detach},
+  {"pthread_exit", (uintptr_t)&dummy_pthread_exit},
+  {"vsscanf", (uintptr_t)&vsscanf},
+  {"wcsnrtombs", (uintptr_t)&dummy_wcsnrtombs},
+  {"inet_pton", (uintptr_t)&dummy_inet_pton},
+  {"__memset_chk", (uintptr_t)&dummy___memset_chk},
+  {"glBindRenderbuffer", (uintptr_t)&glBindRenderbuffer},
+  {"deflateReset", (uintptr_t)&dummy_deflateReset},
+  {"glDeleteBuffers", (uintptr_t)&glDeleteBuffers},
+  {"fputs", (uintptr_t)&fputs},
+  {"glActiveTexture", (uintptr_t)&glActiveTexture},
+  {"clock_gettime", (uintptr_t)&clock_gettime},
+  {"readdir", (uintptr_t)&readdir},
+  {"inflate", (uintptr_t)&inflate},
+  {"glUniform4f", (uintptr_t)&glUniform4f},
+  {"getsockname", (uintptr_t)&dummy_getsockname},
+  {"towupper_l", (uintptr_t)&dummy_towupper_l},
+  {"eglCreateWindowSurface", (uintptr_t)&egl_shim_CreateWindowSurface},
+  {"syscall", (uintptr_t)&dummy_syscall},
+  {"mprotect", (uintptr_t)&mprotect},
+  {"iswspace_l", (uintptr_t)&dummy_iswspace_l},
+  {"recvfrom", (uintptr_t)&recvfrom},
+  {"access", (uintptr_t)&dummy_access},
+  {"strtold", (uintptr_t)&dummy_strtold},
+  {"glDepthRangef", (uintptr_t)&glDepthRangef},
+  {"__fwrite_chk", (uintptr_t)&dummy___fwrite_chk},
+  {"btowc", (uintptr_t)&btowc},
+  {"glIsRenderbuffer", (uintptr_t)&glIsRenderbuffer},
+  {"strtold_l", (uintptr_t)&dummy_strtold_l},
+  {"mbsnrtowcs", (uintptr_t)&dummy_mbsnrtowcs},
+  {"memcpy", (uintptr_t)&memcpy},
+  {"snprintf", (uintptr_t)&snprintf},
+  {"freeifaddrs", (uintptr_t)&dummy_freeifaddrs},
+  {"deflateInit2_", (uintptr_t)&deflateInit2_},
+  {"glTexImage2D", (uintptr_t)&glTexImage2D},
+  {"vfprintf", (uintptr_t)&dummy_vfprintf},
+  {"__cmsg_nxthdr", (uintptr_t)&dummy___cmsg_nxthdr},
+  {"AAsset_close", (uintptr_t)&fake_AAsset_close},
+  {"gai_strerror", (uintptr_t)&dummy_gai_strerror},
+  {"getpeername", (uintptr_t)&dummy_getpeername},
+  {"signal", (uintptr_t)&signal},
+  {"freelocale", (uintptr_t)&dummy_freelocale},
+  {"glRenderbufferStorage", (uintptr_t)&glRenderbufferStorage},
+  {"longjmp", (uintptr_t)&dummy_longjmp},
+  {"newlocale", (uintptr_t)&dummy_newlocale},
+  {"memmove", (uintptr_t)&memmove},
+  {"SL_IID_VOLUME", (uintptr_t)&dummy_SL_IID_VOLUME},
+  {"pthread_cond_broadcast", (uintptr_t)&pthread_cond_broadcast},
+  {"rename", (uintptr_t)&dummy_rename},
+  {"glGetString", (uintptr_t)&glGetString},
+  {"dlerror", (uintptr_t)&dummy_dlerror},
+  {"glUseProgram", (uintptr_t)&glUseProgram},
+  {"pthread_key_create", (uintptr_t)&pthread_key_create},
+  {"glColorMask", (uintptr_t)&glColorMask},
+  {"uselocale", (uintptr_t)&dummy_uselocale},
+  {"inflateReset", (uintptr_t)&dummy_inflateReset},
+  {"nanosleep", (uintptr_t)&nanosleep},
+  {"inet_ntop", (uintptr_t)&dummy_inet_ntop},
+  {"glValidateProgram", (uintptr_t)&glValidateProgram},
+  {"pthread_mutexattr_init", (uintptr_t)&pthread_mutexattr_init},
+  {"eglDestroyContext", (uintptr_t)&egl_shim_DestroyContext},
+  {"eglMakeCurrent", (uintptr_t)&egl_shim_MakeCurrent},
+  {"sincosf", (uintptr_t)&dummy_sincosf},
+  {"eglDestroySurface", (uintptr_t)&egl_shim_DestroySurface},
+  {"eventfd", (uintptr_t)&dummy_eventfd},
+  {"strtoll", (uintptr_t)&dummy_strtoll},
+  {"ALooper_prepare", (uintptr_t)&ret0},
+  {"glTexSubImage2D", (uintptr_t)&glTexSubImage2D},
+  {"pthread_cond_init", (uintptr_t)&pthread_cond_init},
+  {"glCullFace", (uintptr_t)&glCullFace},
+  {"inflateInit_", (uintptr_t)&dummy_inflateInit_},
+  {"strxfrm_l", (uintptr_t)&dummy_strxfrm_l},
+  {"strncpy", (uintptr_t)&strncpy},
+  {"iswprint_l", (uintptr_t)&dummy_iswprint_l},
   {"posix_memalign", (uintptr_t)&dummy_posix_memalign},
-  {"__system_property_get", (uintptr_t)&dummy___system_property_get},
+  {"glCheckFramebufferStatus", (uintptr_t)&glCheckFramebufferStatus},
+  {"getpwuid_r", (uintptr_t)&dummy_getpwuid_r},
+  {"glGenTextures", (uintptr_t)&glGenTextures},
+  {"sendto", (uintptr_t)&sendto},
+  {"strcmp", (uintptr_t)&strcmp},
+  {"pthread_setspecific", (uintptr_t)&pthread_setspecific},
+  {"glDeleteTextures", (uintptr_t)&glDeleteTextures},
+  {"sigaction", (uintptr_t)&sigaction},
+  {"mkdir", (uintptr_t)&mkdir},
+  {"glGenFramebuffers", (uintptr_t)&glGenFramebuffers},
+  {"pow", (uintptr_t)&pow},
+  {"remove", (uintptr_t)&dummy_remove},
+  {"glCreateProgram", (uintptr_t)&glCreateProgram},
+  {"eglGetDisplay", (uintptr_t)&egl_shim_GetDisplay},
+  {"if_nametoindex", (uintptr_t)&dummy_if_nametoindex},
+  {"malloc", (uintptr_t)&malloc},
+  {"memrchr", (uintptr_t)&dummy_memrchr},
+  {"atan", (uintptr_t)&dummy_atan},
+  {"sigaltstack", (uintptr_t)&dummy_sigaltstack},
+  {"glBufferData", (uintptr_t)&glBufferData},
+  {"eglInitialize", (uintptr_t)&egl_shim_Initialize},
+  {"glFramebufferRenderbuffer", (uintptr_t)&glFramebufferRenderbuffer},
+  {"sysconf", (uintptr_t)&sysconf},
+  {"crc32", (uintptr_t)&crc32},
+  {"iswdigit_l", (uintptr_t)&dummy_iswdigit_l},
+  {"glDrawArrays", (uintptr_t)&glDrawArrays},
+  {"glStencilFunc", (uintptr_t)&glStencilFunc},
+  {"gmtime_r", (uintptr_t)&dummy_gmtime_r},
+  {"AConfiguration_getLanguage", (uintptr_t)&ret0},
+  {"abort", (uintptr_t)&abort},
+  {"accept", (uintptr_t)&accept},
+  {"glEnableVertexAttribArray", (uintptr_t)&glEnableVertexAttribArray},
+  {"deflate", (uintptr_t)&deflate},
+  {"glGetProgramInfoLog", (uintptr_t)&glGetProgramInfoLog},
+  {"glTexParameteri", (uintptr_t)&glTexParameteri},
+  {"glDeleteProgram", (uintptr_t)&glDeleteProgram},
+  {"pthread_rwlock_rdlock", (uintptr_t)&dummy_pthread_rwlock_rdlock},
+  {"eglChooseConfig", (uintptr_t)&egl_shim_ChooseConfig},
+  {"__strncpy_chk", (uintptr_t)&dummy___strncpy_chk},
+  {"AMotionEvent_getAction", (uintptr_t)&ret0},
+  {"wcstoull", (uintptr_t)&dummy_wcstoull},
+  {"pthread_getspecific", (uintptr_t)&pthread_getspecific},
+  {"__sF", (uintptr_t)&fake_sF},
+  {"qsort", (uintptr_t)&qsort},
+  {"getpid", (uintptr_t)&getpid},
+  {"strcat", (uintptr_t)&strcat},
+  {"glBindBuffer", (uintptr_t)&glBindBuffer},
+  {"glEnable", (uintptr_t)&glEnable},
+  {"SL_IID_PLAY", (uintptr_t)&dummy_SL_IID_PLAY},
+  {"fread", (uintptr_t)&fread},
+  {"basename", (uintptr_t)&basename},
+  {"wcslen", (uintptr_t)&wcslen},
+  {"__cxa_finalize", (uintptr_t)&dummy___cxa_finalize},
+  {"pthread_mutexattr_settype", (uintptr_t)&pthread_mutexattr_settype},
+  {"sched_yield", (uintptr_t)&dummy_sched_yield},
+  {"glDeleteFramebuffers", (uintptr_t)&glDeleteFramebuffers},
+  {"AAsset_openFileDescriptor", (uintptr_t)&fake_AAsset_openFileDescriptor},
+  {"stat", (uintptr_t)&stat},
+  {"fileno", (uintptr_t)&fileno},
+  {"pthread_cond_timedwait", (uintptr_t)&pthread_cond_timedwait},
+  {"glStencilOp", (uintptr_t)&glStencilOp},
+  {"log10f", (uintptr_t)&log10f},
+  {"AInputQueue_finishEvent", (uintptr_t)&ret0},
+  {"wcstold", (uintptr_t)&dummy_wcstold},
+  {"fopen", (uintptr_t)&fopen},
+  {"__android_log_write", (uintptr_t)&__android_log_print},
+  {"glGetAttribLocation", (uintptr_t)&glGetAttribLocation},
+  {"mbtowc", (uintptr_t)&dummy_mbtowc},
+  {"AConfiguration_new", (uintptr_t)&ret0},
+  {"mktime", (uintptr_t)&dummy_mktime},
+  {"setsockopt", (uintptr_t)&dummy_setsockopt},
+  {"AMotionEvent_getX", (uintptr_t)&ret0},
+  {"realpath", (uintptr_t)&realpath},
+  {"eglQuerySurface", (uintptr_t)&egl_shim_QuerySurface},
+  {"glGetShaderiv", (uintptr_t)&glGetShaderiv},
   {"dl_iterate_phdr", (uintptr_t)&dummy_dl_iterate_phdr},
-};
-
-const int dynlib_functions_count = sizeof(dynlib_functions)/sizeof(dynlib_functions[0]);
-size_t dynlib_numfunctions = sizeof(dynlib_functions) / sizeof(DynLibFunction);
+  {"__vsnprintf_chk", (uintptr_t)&dummy___vsnprintf_chk},
+  {"vsnprintf", (uintptr_t)&vsnprintf},
+  {"AMotionEvent_getPointerId", (uintptr_t)&ret0},
+  {"strspn", (uintptr_t)&dummy_strspn},
+  {"strpbrk", (uintptr_t)&strpbrk},
+  {"AInputQueue_detachLooper", (uintptr_t)&ret0},
+  {"fwrite", (uintptr_t)&fwrite},
+  {"AAsset_getLength", (uintptr_t)&fake_AAsset_getLength},
+  {"getifaddrs", (uintptr_t)&dummy_getifaddrs},
+  {"setvbuf", (uintptr_t)&setvbuf},
+  {"vasprintf", (uintptr_t)&vasprintf},
+  {"socketpair", (uintptr_t)&dummy_socketpair},
+  {"mbsrtowcs", (uintptr_t)&dummy_mbsrtowcs},
+  {"eglGetProcAddress", (uintptr_t)&egl_shim_GetProcAddress},
+  {"localtime", (uintptr_t)&localtime},
+  {"openlog", (uintptr_t)&dummy_openlog},
+  {"glDeleteRenderbuffers", (uintptr_t)&glDeleteRenderbuffers},
+  {"bind", (uintptr_t)&bind},
+  {"strtoull_l", (uintptr_t)&dummy_strtoull_l},
+  {"AMotionEvent_getY", (uintptr_t)&ret0},
+  {"glBlendFunc", (uintptr_t)&glBlendFunc},
+  {"iswblank_l", (uintptr_t)&dummy_iswblank_l},
+  {"memcmp", (uintptr_t)&memcmp},
+  {"freeaddrinfo", (uintptr_t)&dummy_freeaddrinfo},
+  {"glBindFramebuffer", (uintptr_t)&glBindFramebuffer},
+  {"iswpunct_l", (uintptr_t)&dummy_iswpunct_l},
+  {"wctob", (uintptr_t)&wctob},
+  {"glGetUniformLocation", (uintptr_t)&glGetUniformLocation},
+  {"mbrlen", (uintptr_t)&dummy_mbrlen},
+  {"inflateInit2_", (uintptr_t)&inflateInit2_},
+  {"glClearColor", (uintptr_t)&glClearColor},
+  {"poll", (uintptr_t)&poll},
+  {"inflateEnd", (uintptr_t)&inflateEnd},
+  {"fprintf", (uintptr_t)&fprintf},
+  {"atof", (uintptr_t)&atof},
+  {"pthread_mutex_trylock", (uintptr_t)&dummy_pthread_mutex_trylock},
+  {"shutdown", (uintptr_t)&shutdown},
+  {"AAssetManager_open", (uintptr_t)&fake_AAssetManager_open},
+  {"__strchr_chk", (uintptr_t)&dummy___strchr_chk},
+  {"pthread_equal", (uintptr_t)&dummy_pthread_equal},
+  {"eglGetConfigAttrib", (uintptr_t)&egl_shim_GetConfigAttrib},
+  {"SL_IID_SEEK", (uintptr_t)&dummy_SL_IID_SEEK},
+  {"close", (uintptr_t)&close},
+  {"glGetError", (uintptr_t)&glGetError},
+  {"pthread_cond_wait", (uintptr_t)&pthread_cond_wait},
+  {"atan2f", (uintptr_t)&atan2f},
+  {"glIsFramebuffer", (uintptr_t)&glIsFramebuffer},
+  {"iswcntrl_l", (uintptr_t)&dummy_iswcntrl_l},
+  {"fseeko", (uintptr_t)&dummy_fseeko},
+  {"pthread_join", (uintptr_t)&pthread_join},
+  {"ANativeActivity_finish", (uintptr_t)&ret0},
+  {"glLinkProgram", (uintptr_t)&glLinkProgram},
+  {"pthread_attr_init", (uintptr_t)&dummy_pthread_attr_init},
+  {"mmap", (uintptr_t)&mmap},
+  {"cosf", (uintptr_t)&cosf},
+  {"__memmove_chk", (uintptr_t)&dummy___memmove_chk},
+  {"sendmmsg", (uintptr_t)&dummy_sendmmsg},
+  {"localeconv", (uintptr_t)&dummy_localeconv},
+  {"__open_2", (uintptr_t)&dummy___open_2},
+  {"eglCreateContext", (uintptr_t)&egl_shim_CreateContext},
+  {"pthread_key_delete", (uintptr_t)&pthread_key_delete},
+  {"fstat", (uintptr_t)&fstat},
+  {"eglTerminate", (uintptr_t)&egl_shim_Terminate},
+  {"ANativeWindow_setBuffersGeometry", (uintptr_t)&ret0},
+  {"__strncpy_chk2", (uintptr_t)&dummy___strncpy_chk2},
+  {"unlink", (uintptr_t)&unlink},
+  {"__FD_SET_chk", (uintptr_t)&dummy___FD_SET_chk},
+  {"ftell", (uintptr_t)&ftell},
+  {"__memcpy_chk", (uintptr_t)&dummy___memcpy_chk},
+  {"glDeleteShader", (uintptr_t)&glDeleteShader},
+  {"__memchr_chk", (uintptr_t)&dummy___memchr_chk},
+  {"glFramebufferTexture2D", (uintptr_t)&glFramebufferTexture2D},
+  {"glGetProgramiv", (uintptr_t)&glGetProgramiv},
+  {"swprintf", (uintptr_t)&swprintf},
+  {"AMotionEvent_getEventTime", (uintptr_t)&ret0},
+  {"glGenBuffers", (uintptr_t)&glGenBuffers},
+  {"wmemchr", (uintptr_t)&dummy_wmemchr},
+  {"munmap", (uintptr_t)&munmap},
+  {"write", (uintptr_t)&write},
+  {"closedir", (uintptr_t)&closedir},
+  {"__ctype_get_mb_cur_max", (uintptr_t)&dummy___ctype_get_mb_cur_max},
+  {"connect", (uintptr_t)&connect},
+  {"__poll_chk", (uintptr_t)&dummy___poll_chk},
+  {"AInputQueue_attachLooper", (uintptr_t)&ret0},
+  {"glStencilMask", (uintptr_t)&glStencilMask},
+  {"glCompileShader", (uintptr_t)&glCompileShader},
+  {"__stack_chk_fail", (uintptr_t)&dummy___stack_chk_fail},
+  {"select", (uintptr_t)&select},
+  {"strerror", (uintptr_t)&strerror},
+  {"AKeyEvent_getKeyCode", (uintptr_t)&ret0},
+  {"__strlen_chk", (uintptr_t)&dummy___strlen_chk},
+  {"fdopen", (uintptr_t)&fdopen},
+  {"getentropy", (uintptr_t)&dummy_getentropy},
+  {"madvise", (uintptr_t)&dummy_madvise},
+  {"strcoll_l", (uintptr_t)&dummy_strcoll_l},
+  {"srand", (uintptr_t)&srand},
+  {"frexp", (uintptr_t)&frexp},
+  {"gmtime", (uintptr_t)&gmtime},
+  {"stderr", (uintptr_t)&stderr},
+  {"wcsxfrm_l", (uintptr_t)&dummy_wcsxfrm_l},
+  {"glDrawElements", (uintptr_t)&glDrawElements},
+  {"read", (uintptr_t)&read},
+  {"time", (uintptr_t)&time},
+  {"ftello", (uintptr_t)&dummy_ftello},
+  {"glUniform1i", (uintptr_t)&glUniform1i},
+  {"__vsprintf_chk", (uintptr_t)&dummy___vsprintf_chk},
+  {"glShaderSource", (uintptr_t)&glShaderSource},
+  {"ALooper_addFd", (uintptr_t)&ret0},
+  {"strcpy", (uintptr_t)&strcpy},
+  {"__fread_chk", (uintptr_t)&dummy___fread_chk},
+  {"glIsTexture", (uintptr_t)&glIsTexture},
+  {"wcstoul", (uintptr_t)&dummy_wcstoul},
+  {"glGenRenderbuffers", (uintptr_t)&glGenRenderbuffers},
+  {"fgets", (uintptr_t)&fgets},
+  {"__strcpy_chk", (uintptr_t)&dummy___strcpy_chk},
+  {"getenv", (uintptr_t)&getenv},
+  {"towlower_l", (uintptr_t)&dummy_towlower_l},
+  {"AAsset_read", (uintptr_t)&fake_AAsset_read},
+  {"fflush", (uintptr_t)&fflush},
+  {"iswalpha_l", (uintptr_t)&dummy_iswalpha_l},
+  {"feof", (uintptr_t)&feof},
+  {"usleep", (uintptr_t)&usleep},
+  {"__cxa_atexit", (uintptr_t)&dummy___cxa_atexit},
+  {"strrchr", (uintptr_t)&strrchr},
+  {"closelog", (uintptr_t)&dummy_closelog},
+  {"strtof", (uintptr_t)&strtof},
+  {"AInputQueue_getEvent", (uintptr_t)&ret0},
+  {"slCreateEngine", (uintptr_t)&dummy_slCreateEngine},
+  {"pthread_cond_signal", (uintptr_t)&pthread_cond_signal},
+  {"glCreateShader", (uintptr_t)&glCreateShader},
+  {"wmemcmp", (uintptr_t)&dummy_wmemcmp},
+  {"__errno", (uintptr_t)&dummy___errno},
+  {"getauxval", (uintptr_t)&dummy_getauxval},
+  {"free", (uintptr_t)&free},
+  {"accept4", (uintptr_t)&dummy_accept4},
+  {"modf", (uintptr_t)&dummy_modf},
+  {"iswupper_l", (uintptr_t)&dummy_iswupper_l},
+  {"pthread_mutex_init", (uintptr_t)&pthread_mutex_init},
+  {"open", (uintptr_t)&open},
+  {"strftime_l", (uintptr_t)&dummy_strftime_l},
+  {"AConfiguration_delete", (uintptr_t)&ret0},
+  {"fputc", (uintptr_t)&fputc},
+  {"sscanf", (uintptr_t)&sscanf},
+  {"exit", (uintptr_t)&exit},
+  {"strtoul", (uintptr_t)&strtoul},
+  {"memset", (uintptr_t)&memset},
+  {"gettimeofday", (uintptr_t)&gettimeofday},
+  {"SL_IID_BUFFERQUEUE", (uintptr_t)&dummy_SL_IID_BUFFERQUEUE},
+  {"getaddrinfo", (uintptr_t)&dummy_getaddrinfo},
+  {"strlen", (uintptr_t)&strlen},
+  {"glViewport", (uintptr_t)&glViewport},
+  {"strftime", (uintptr_t)&strftime},
+  {"strncmp", (uintptr_t)&strncmp},
+  {"AInputEvent_getDeviceId", (uintptr_t)&ret0},
+  {"stdin", (uintptr_t)&stdin},
+  {"AConfiguration_fromAssetManager", (uintptr_t)&ret0},
+  {"pthread_create", (uintptr_t)&pthread_create},
+  {"atoi", (uintptr_t)&atoi},
+  {"__system_property_get", (uintptr_t)&dummy___system_property_get},
+  {"wcstoll", (uintptr_t)&dummy_wcstoll},
