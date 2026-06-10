@@ -3,6 +3,17 @@
 #include "imports.h"
 
 #include "so_util.h"
+#include "util.h"
+
+
+#include <stdlib.h>
+#include <ctype.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/time.h>
+#include "opensles_shim.h"
+#include "android_shim.h"
+#include "egl_shim.h"
 
 #include <stdio.h>
 
@@ -10,7 +21,6 @@
 int __android_log_print(int prio, const char* tag, const char* fmt, ...);
 int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap);
 int __android_log_write(int prio, const char* tag, const char* text);
-int compress2(void);
 void *eglQueryString_shim(void *dpy, int name);
 
 
@@ -249,7 +259,7 @@ DynLibFunction dynlib_functions[] = {
   {"__android_log_write", (uintptr_t)&__android_log_write},  // liblog
 
   {"__assert2", (uintptr_t)&__assert2},
-  {"__errno", (uintptr_t)&__errno},  // pass
+  {"__errno", (uintptr_t)&__errno_location},  // pass
 
   {"__sF", (uintptr_t)&fake_sF},
   {"__stack_chk_fail", (uintptr_t)&__stack_chk_fail},  // abi
@@ -603,13 +613,13 @@ DynLibFunction dynlib_functions[] = {
 
   {"pthread_create", (uintptr_t)&pthread_create_fake},  // pthread wrapper
 
-  {"pthread_getspecific", (uintptr_t)&pthread_getspecific_fake},  // pthread wrapper
+  {"pthread_getspecific", (uintptr_t)&pthread_getspecific},  // pthread wrapper
 
-  {"pthread_join", (uintptr_t)&pthread_join_fake},  // pthread wrapper
+  {"pthread_join", (uintptr_t)&pthread_join},  // pthread wrapper
 
-  {"pthread_key_create", (uintptr_t)&pthread_key_create_fake},  // pthread wrapper
+  {"pthread_key_create", (uintptr_t)&pthread_key_create},  // pthread wrapper
 
-  {"pthread_key_delete", (uintptr_t)&pthread_key_delete_fake},  // pthread wrapper
+  {"pthread_key_delete", (uintptr_t)&pthread_key_delete},  // pthread wrapper
 
   {"pthread_mutex_destroy", (uintptr_t)&pthread_mutex_destroy_fake},  // pthread wrapper
 
@@ -619,19 +629,19 @@ DynLibFunction dynlib_functions[] = {
 
   {"pthread_mutex_unlock", (uintptr_t)&pthread_mutex_unlock_fake},  // pthread wrapper
 
-  {"pthread_mutexattr_destroy", (uintptr_t)&pthread_mutexattr_destroy_fake},  // pthread wrapper
+  {"pthread_mutexattr_destroy", (uintptr_t)&pthread_mutexattr_destroy},  // pthread wrapper
 
-  {"pthread_mutexattr_init", (uintptr_t)&pthread_mutexattr_init_fake},  // pthread wrapper
+  {"pthread_mutexattr_init", (uintptr_t)&pthread_mutexattr_init},  // pthread wrapper
 
-  {"pthread_mutexattr_settype", (uintptr_t)&pthread_mutexattr_settype_fake},  // pthread wrapper
+  {"pthread_mutexattr_settype", (uintptr_t)&pthread_mutexattr_settype},  // pthread wrapper
 
   {"pthread_once", (uintptr_t)&pthread_once_fake},  // pthread wrapper
 
-  {"pthread_self", (uintptr_t)&pthread_self_fake},  // pthread wrapper
+  {"pthread_self", (uintptr_t)&pthread_self},  // pthread wrapper
 
-  {"pthread_setschedparam", (uintptr_t)&pthread_setschedparam_fake},  // pthread wrapper
+  {"pthread_setschedparam", (uintptr_t)&pthread_setschedparam},  // pthread wrapper
 
-  {"pthread_setspecific", (uintptr_t)&pthread_setspecific_fake},  // pthread wrapper
+  {"pthread_setspecific", (uintptr_t)&pthread_setspecific},  // pthread wrapper
 
   {"qsort", (uintptr_t)&qsort},  // pass
 
