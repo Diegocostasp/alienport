@@ -34,7 +34,7 @@
 #include <sys/auxv.h>
 #include <sys/ioctl.h>
 
-int ret0(void) { return 0; }
+extern int ret0(void);
 
 int __android_log_print(int prio, const char* tag, const char* fmt, ...) {
     va_list ap;
@@ -614,4 +614,4 @@ DynLibFunction dynlib_functions[] = {
   {"wmemcmp", (uintptr_t)&wmemcmp},
   {"write", (uintptr_t)&write},
 };
-const int dynlib_functions_count = sizeof(dynlib_functions) / sizeof(dynlib_functions[0]);
+size_t dynlib_numfunctions = sizeof(dynlib_functions) / sizeof(dynlib_functions[0]);
