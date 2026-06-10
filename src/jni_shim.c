@@ -725,8 +725,7 @@ static jint jni_CallStaticIntMethod(void *env, void *clazz, void *methodID,
   (void)env;
   (void)clazz;
   (void)methodID;
-  debugPrintf("jni_shim: CallStaticIntMethod(mid=%p)
-", methodID);
+  debugPrintf("jni_shim: CallStaticIntMethod(mid=%p)\\n", methodID);
   return 0;
 }
 
