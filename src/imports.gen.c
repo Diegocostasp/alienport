@@ -145,98 +145,152 @@ ssize_t fake___write_chk(int fd, const void *buf, size_t nbytes, size_t buflen) 
 int fake___FD_SET_chk(int fd, fd_set *set, size_t buflen) { FD_SET(fd, set); return 0; }
 int fake___poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, size_t buflen) { return poll(fds, nfds, timeout); }
 
-// PTHREAD SHIMS (Android structs are 40-56 bytes, Glibc are 48-64 bytes)
-typedef struct { void* ptr; } wrapper_t;
+// PTHREAD SHIMS
+#define SHIM_MAGIC 0x8BADF00D12345678ULL
 
-int fake_pthread_mutex_init(wrapper_t *m, const pthread_mutexattr_t *attr) { m->ptr = malloc(sizeof(pthread_mutex_t)); return pthread_mutex_init(m->ptr, attr); }
-int fake_pthread_mutex_lock(wrapper_t *m) { if (!m->ptr) { m->ptr = malloc(sizeof(pthread_mutex_t)); pthread_mutex_init(m->ptr, NULL); } return pthread_mutex_lock(m->ptr); }
-int fake_pthread_mutex_unlock(wrapper_t *m) { if (!m->ptr) return 0; return pthread_mutex_unlock(m->ptr); }
-int fake_pthread_mutex_trylock(wrapper_t *m) { if (!m->ptr) { m->ptr = malloc(sizeof(pthread_mutex_t)); pthread_mutex_init(m->ptr, NULL); } return pthread_mutex_trylock(m->ptr); }
-int fake_pthread_mutex_destroy(wrapper_t *m) { if (!m->ptr) return 0; int r = pthread_mutex_destroy(m->ptr); free(m->ptr); m->ptr = NULL; return r; }
+static void* get_real_ptr(void* obj, size_t size, size_t real_size, void (*init_fn)(void*)) {
+    if (!obj) return NULL;
+    uint64_t* magic_ptr = (uint64_t*)((char*)obj + size - 16);
+    void** ptr = (void**)((char*)obj + size - 8);
+    
+    if (*magic_ptr != SHIM_MAGIC || *ptr == NULL) {
+        *ptr = calloc(1, real_size);
+        if (init_fn) init_fn(*ptr);
+        *magic_ptr = SHIM_MAGIC;
+    }
+    return *ptr;
+}
 
-int fake_pthread_cond_init(wrapper_t *c, const pthread_condattr_t *attr) { c->ptr = malloc(sizeof(pthread_cond_t)); return pthread_cond_init(c->ptr, attr); }
-int fake_pthread_cond_wait(wrapper_t *c, wrapper_t *m) { if (!c->ptr) { c->ptr = malloc(sizeof(pthread_cond_t)); pthread_cond_init(c->ptr, NULL); } return pthread_cond_wait(c->ptr, m->ptr); }
-int fake_pthread_cond_timedwait(wrapper_t *c, wrapper_t *m, const struct timespec *abstime) { if (!c->ptr) { c->ptr = malloc(sizeof(pthread_cond_t)); pthread_cond_init(c->ptr, NULL); } return pthread_cond_timedwait(c->ptr, m->ptr, abstime); }
-int fake_pthread_cond_signal(wrapper_t *c) { if (!c->ptr) return 0; return pthread_cond_signal(c->ptr); }
-int fake_pthread_cond_broadcast(wrapper_t *c) { if (!c->ptr) return 0; return pthread_cond_broadcast(c->ptr); }
-int fake_pthread_cond_destroy(wrapper_t *c) { if (!c->ptr) return 0; int r = pthread_cond_destroy(c->ptr); free(c->ptr); c->ptr = NULL; return r; }
+static void mutex_init_default(void* p) { pthread_mutex_init((pthread_mutex_t*)p, NULL); }
+static void cond_init_default(void* p) { pthread_cond_init((pthread_cond_t*)p, NULL); }
+static void rwlock_init_default(void* p) { pthread_rwlock_init((pthread_rwlock_t*)p, NULL); }
 
-int fake_pthread_rwlock_init(wrapper_t *rw, const pthread_rwlockattr_t *attr) { rw->ptr = malloc(sizeof(pthread_rwlock_t)); return pthread_rwlock_init(rw->ptr, attr); }
-int fake_pthread_rwlock_rdlock(wrapper_t *rw) { if (!rw->ptr) { rw->ptr = malloc(sizeof(pthread_rwlock_t)); pthread_rwlock_init(rw->ptr, NULL); } return pthread_rwlock_rdlock(rw->ptr); }
-int fake_pthread_rwlock_wrlock(wrapper_t *rw) { if (!rw->ptr) { rw->ptr = malloc(sizeof(pthread_rwlock_t)); pthread_rwlock_init(rw->ptr, NULL); } return pthread_rwlock_wrlock(rw->ptr); }
-int fake_pthread_rwlock_unlock(wrapper_t *rw) { if (!rw->ptr) return 0; return pthread_rwlock_unlock(rw->ptr); }
-int fake_pthread_rwlock_destroy(wrapper_t *rw) { if (!rw->ptr) return 0; int r = pthread_rwlock_destroy(rw->ptr); free(rw->ptr); rw->ptr = NULL; return r; }
+#define SZ_MUTEX 40
+#define SZ_COND 48
+#define SZ_RWLOCK 56
+#define SZ_ATTR 56
 
-int fake_pthread_attr_init(wrapper_t *a) { a->ptr = malloc(sizeof(pthread_attr_t)); return pthread_attr_init(a->ptr); }
-int fake_pthread_attr_setdetachstate(wrapper_t *a, int state) { if (!a->ptr) return 0; return pthread_attr_setdetachstate(a->ptr, state); }
-int fake_pthread_attr_destroy(wrapper_t *a) { if (!a->ptr) return 0; int r = pthread_attr_destroy(a->ptr); free(a->ptr); a->ptr = NULL; return r; }
+#define GET_MUTEX(m) ((pthread_mutex_t*)get_real_ptr(m, SZ_MUTEX, sizeof(pthread_mutex_t), mutex_init_default))
+#define GET_COND(c)  ((pthread_cond_t*)get_real_ptr(c, SZ_COND, sizeof(pthread_cond_t), cond_init_default))
+#define GET_RWLOCK(rw) ((pthread_rwlock_t*)get_real_ptr(rw, SZ_RWLOCK, sizeof(pthread_rwlock_t), rwlock_init_default))
 
-int fake_pthread_create(pthread_t *thread, wrapper_t *attr, void *(*start_routine) (void *), void *arg) { return pthread_create(thread, attr ? attr->ptr : NULL, start_routine, arg); }
+int fake_pthread_mutex_init(void *m, const pthread_mutexattr_t *attr) {
+    if (!m) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)m + SZ_MUTEX - 16);
+    void** ptr = (void**)((char*)m + SZ_MUTEX - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) { free(*ptr); }
+    *ptr = calloc(1, sizeof(pthread_mutex_t));
+    *magic_ptr = SHIM_MAGIC;
+    return pthread_mutex_init((pthread_mutex_t*)*ptr, attr);
+}
+int fake_pthread_mutex_lock(void *m) { return pthread_mutex_lock(GET_MUTEX(m)); }
+int fake_pthread_mutex_unlock(void *m) { return pthread_mutex_unlock(GET_MUTEX(m)); }
+int fake_pthread_mutex_trylock(void *m) { return pthread_mutex_trylock(GET_MUTEX(m)); }
+int fake_pthread_mutex_destroy(void *m) {
+    if (!m) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)m + SZ_MUTEX - 16);
+    void** ptr = (void**)((char*)m + SZ_MUTEX - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) {
+        int r = pthread_mutex_destroy((pthread_mutex_t*)*ptr);
+        free(*ptr);
+        *ptr = NULL;
+        *magic_ptr = 0;
+        return r;
+    }
+    return 0;
+}
 
+int fake_pthread_cond_init(void *c, const pthread_condattr_t *attr) {
+    if (!c) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)c + SZ_COND - 16);
+    void** ptr = (void**)((char*)c + SZ_COND - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) { free(*ptr); }
+    *ptr = calloc(1, sizeof(pthread_cond_t));
+    *magic_ptr = SHIM_MAGIC;
+    return pthread_cond_init((pthread_cond_t*)*ptr, attr);
+}
+int fake_pthread_cond_wait(void *c, void *m) { return pthread_cond_wait(GET_COND(c), GET_MUTEX(m)); }
+int fake_pthread_cond_timedwait(void *c, void *m, const struct timespec *abstime) { return pthread_cond_timedwait(GET_COND(c), GET_MUTEX(m), abstime); }
+int fake_pthread_cond_signal(void *c) { return pthread_cond_signal(GET_COND(c)); }
+int fake_pthread_cond_broadcast(void *c) { return pthread_cond_broadcast(GET_COND(c)); }
+int fake_pthread_cond_destroy(void *c) {
+    if (!c) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)c + SZ_COND - 16);
+    void** ptr = (void**)((char*)c + SZ_COND - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) {
+        int r = pthread_cond_destroy((pthread_cond_t*)*ptr);
+        free(*ptr); *ptr = NULL; *magic_ptr = 0;
+        return r;
+    }
+    return 0;
+}
 
-int dummy_SL_IID_BUFFERQUEUE() { return 0; }
-int dummy_SL_IID_ENGINE() { return 0; }
-int dummy_SL_IID_PLAY() { return 0; }
-int dummy_SL_IID_SEEK() { return 0; }
-int dummy_SL_IID_VOLUME() { return 0; }
-int dummy___cmsg_nxthdr() { return 0; }
-int dummy___ctype_get_mb_cur_max() { return 0; }
-int dummy___cxa_atexit() { return 0; }
-int dummy___cxa_finalize() { return 0; }
-int dummy___open_2() { return 0; }
-int dummy___register_atfork() { return 0; }
-int dummy___sF() { return 0; }
-int dummy___stack_chk_fail() { return 0; }
-int dummy___system_property_get() { return 0; }
-int dummy_accept4() { return 0; }
-int dummy_android_set_abort_message() { return 0; }
-int dummy_deflateReset() { return 0; }
-int dummy_eventfd() { return 0; }
-int dummy_freeifaddrs() { return 0; }
-int dummy_freelocale() { return 0; }
-int dummy_gai_strerror() { return 0; }
-int dummy_getauxval() { return 0; }
-int dummy_getentropy() { return 0; }
-int dummy_geteuid() { return 0; }
-int dummy_getifaddrs() { return 0; }
-int dummy_getpwuid_r() { return 0; }
-int dummy_gmtime_r() { return 0; }
-int dummy_if_nametoindex() { return 0; }
-int dummy_inflateReset() { return 0; }
-int dummy_inflateReset2() { return 0; }
-int dummy_mbrlen() { return 0; }
-int dummy_mbsrtowcs() { return 0; }
-int dummy_mbtowc() { return 0; }
-int dummy_mlock() { return 0; }
-int dummy_newlocale() { return 0; }
-int dummy_recvmmsg() { return 0; }
-int dummy_sendmmsg() { return 0; }
-int dummy_shutdown() { return 0; }
-int dummy_sigaltstack() { return 0; }
-int dummy_sincosf() { return 0; }
-int dummy_slCreateEngine() { return 0; }
-int dummy_socketpair() { return 0; }
-int dummy_strcoll_l() { return 0; }
-int dummy_strcspn() { return 0; }
-int dummy_strerror_r() { return 0; }
-int dummy_strftime_l() { return 0; }
-int dummy_strpbrk() { return 0; }
-int dummy_strptime() { return 0; }
-int dummy_strspn() { return 0; }
-int dummy_strtold() { return 0; }
-int dummy_strtold_l() { return 0; }
-int dummy_strtoll_l() { return 0; }
-int dummy_strtoull_l() { return 0; }
-int dummy_strxfrm_l() { return 0; }
-int dummy_swprintf() { return 0; }
-int dummy_syscall() { return 0; }
-int dummy_uselocale() { return 0; }
-int dummy_vfprintf() { return 0; }
-int dummy_wcscoll_l() { return 0; }
-int dummy_wcstold() { return 0; }
-int dummy_wcsxfrm_l() { return 0; }
+int fake_pthread_rwlock_init(void *rw, const pthread_rwlockattr_t *attr) {
+    if (!rw) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)rw + SZ_RWLOCK - 16);
+    void** ptr = (void**)((char*)rw + SZ_RWLOCK - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) { free(*ptr); }
+    *ptr = calloc(1, sizeof(pthread_rwlock_t));
+    *magic_ptr = SHIM_MAGIC;
+    return pthread_rwlock_init((pthread_rwlock_t*)*ptr, attr);
+}
+int fake_pthread_rwlock_rdlock(void *rw) { return pthread_rwlock_rdlock(GET_RWLOCK(rw)); }
+int fake_pthread_rwlock_wrlock(void *rw) { return pthread_rwlock_wrlock(GET_RWLOCK(rw)); }
+int fake_pthread_rwlock_unlock(void *rw) { return pthread_rwlock_unlock(GET_RWLOCK(rw)); }
+int fake_pthread_rwlock_destroy(void *rw) {
+    if (!rw) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)rw + SZ_RWLOCK - 16);
+    void** ptr = (void**)((char*)rw + SZ_RWLOCK - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) {
+        int r = pthread_rwlock_destroy((pthread_rwlock_t*)*ptr);
+        free(*ptr); *ptr = NULL; *magic_ptr = 0;
+        return r;
+    }
+    return 0;
+}
 
-DynLibFunction dynlib_functions[] = {
+int fake_pthread_attr_init(void *a) {
+    if (!a) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)a + SZ_ATTR - 16);
+    void** ptr = (void**)((char*)a + SZ_ATTR - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) { free(*ptr); }
+    *ptr = calloc(1, sizeof(pthread_attr_t));
+    *magic_ptr = SHIM_MAGIC;
+    return pthread_attr_init((pthread_attr_t*)*ptr);
+}
+int fake_pthread_attr_setdetachstate(void *a, int state) {
+    if (!a) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)a + SZ_ATTR - 16);
+    void** ptr = (void**)((char*)a + SZ_ATTR - 8);
+    if (*magic_ptr != SHIM_MAGIC || !*ptr) return 0; // Don't try to init an attr here
+    return pthread_attr_setdetachstate((pthread_attr_t*)*ptr, state);
+}
+int fake_pthread_attr_destroy(void *a) {
+    if (!a) return 0;
+    uint64_t* magic_ptr = (uint64_t*)((char*)a + SZ_ATTR - 16);
+    void** ptr = (void**)((char*)a + SZ_ATTR - 8);
+    if (*magic_ptr == SHIM_MAGIC && *ptr) {
+        int r = pthread_attr_destroy((pthread_attr_t*)*ptr);
+        free(*ptr); *ptr = NULL; *magic_ptr = 0;
+        return r;
+    }
+    return 0;
+}
+
+int fake_pthread_create(pthread_t *thread, void *attr, void *(*start_routine) (void *), void *arg) {
+    pthread_attr_t* real_attr = NULL;
+    if (attr) {
+        uint64_t* magic_ptr = (uint64_t*)((char*)attr + SZ_ATTR - 16);
+        void** ptr = (void**)((char*)attr + SZ_ATTR - 8);
+        if (*magic_ptr == SHIM_MAGIC && *ptr) {
+            real_attr = (pthread_attr_t*)*ptr;
+        }
+    }
+    return pthread_create(thread, real_attr, start_routine, arg);
+}
+
+void init_imports() {
+dynlib_functions[] = {
   {"AAssetManager_open", (uintptr_t)&fake_AAssetManager_open},
   {"AAsset_close", (uintptr_t)&fake_AAsset_close},
   {"AAsset_getLength", (uintptr_t)&fake_AAsset_getLength},
@@ -533,7 +587,7 @@ DynLibFunction dynlib_functions[] = {
   {"pthread_key_delete", (uintptr_t)&pthread_key_delete},
   {"pthread_mutex_destroy", (uintptr_t)&fake_pthread_mutex_destroy},
   {"pthread_mutex_init", (uintptr_t)&fake_pthread_mutex_init},
-  {"pthread_mutex_lock", (uintptr_t)&fake_pthread_mutex_lock},
+  {"pthread_mutex_lock", (uintptr_t)fake_pthread_mutex_lock},
   {"pthread_mutex_trylock", (uintptr_t)&fake_pthread_mutex_trylock},
   {"pthread_mutex_unlock", (uintptr_t)&fake_pthread_mutex_unlock},
   {"pthread_mutexattr_destroy", (uintptr_t)&pthread_mutexattr_destroy},
