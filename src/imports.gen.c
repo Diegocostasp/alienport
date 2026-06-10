@@ -33,6 +33,9 @@
 #include <libgen.h>
 #include <sys/auxv.h>
 #include <sys/ioctl.h>
+#include <poll.h>
+#include <sys/select.h>
+#include <link.h>
 
 extern int ret0(void);
 
@@ -119,46 +122,49 @@ int fake_AAsset_openFileDescriptor(AAsset *asset, long *outStart, long *outLengt
     return -1;
 }
 
+// Android _chk functions
+void *fake___memcpy_chk(void *dest, const void *src, size_t len, size_t destlen) { return memcpy(dest, src, len); }
+void *fake___memmove_chk(void *dest, const void *src, size_t len, size_t destlen) { return memmove(dest, src, len); }
+void *fake___memset_chk(void *dest, int c, size_t len, size_t destlen) { return memset(dest, c, len); }
+char *fake___strcpy_chk(char *dest, const char *src, size_t destlen) { return strcpy(dest, src); }
+char *fake___strncpy_chk(char *dest, const char *src, size_t len, size_t destlen) { return strncpy(dest, src, len); }
+char *fake___strncpy_chk2(char *dest, const char *src, size_t len, size_t destlen, size_t srclen) { return strncpy(dest, src, len); }
+char *fake___strchr_chk(const char *s, int c, size_t slen) { return strchr(s, c); }
+size_t fake___strlen_chk(const char *s, size_t maxlen) { return strlen(s); }
+char *fake___strcat_chk(char *dest, const char *src, size_t destlen) { return strcat(dest, src); }
+char *fake___strncat_chk(char *dest, const char *src, size_t len, size_t destlen) { return strncat(dest, src, len); }
+int fake___vsprintf_chk(char *s, int flag, size_t os, const char *fmt, va_list ap) { return vsprintf(s, fmt, ap); }
+int fake___vsnprintf_chk(char *s, size_t maxlen, int flag, size_t os, const char *fmt, va_list ap) { return vsnprintf(s, maxlen, fmt, ap); }
+int fake___sprintf_chk(char *s, int flag, size_t os, const char *fmt, ...) { va_list ap; va_start(ap, fmt); int ret = vsprintf(s, fmt, ap); va_end(ap); return ret; }
+int fake___snprintf_chk(char *s, size_t maxlen, int flag, size_t os, const char *fmt, ...) { va_list ap; va_start(ap, fmt); int ret = vsnprintf(s, maxlen, fmt, ap); va_end(ap); return ret; }
+size_t fake___fread_chk(void *ptr, size_t size, size_t nmemb, FILE *stream, size_t ptr_size) { return fread(ptr, size, nmemb, stream); }
+size_t fake___fwrite_chk(const void *ptr, size_t size, size_t nmemb, FILE *stream, size_t ptr_size) { return fwrite(ptr, size, nmemb, stream); }
+void *fake___memchr_chk(const void *s, int c, size_t n, size_t s_len) { return memchr(s, c, n); }
+ssize_t fake___read_chk(int fd, void *buf, size_t nbytes, size_t buflen) { return read(fd, buf, nbytes); }
+ssize_t fake___write_chk(int fd, const void *buf, size_t nbytes, size_t buflen) { return write(fd, buf, nbytes); }
+int fake___FD_SET_chk(int fd, fd_set *set, size_t buflen) { FD_SET(fd, set); return 0; }
+int fake___poll_chk(struct pollfd *fds, nfds_t nfds, int timeout, size_t buflen) { return poll(fds, nfds, timeout); }
+
 int dummy_SL_IID_BUFFERQUEUE() { return 0; }
 int dummy_SL_IID_ENGINE() { return 0; }
 int dummy_SL_IID_PLAY() { return 0; }
 int dummy_SL_IID_SEEK() { return 0; }
 int dummy_SL_IID_VOLUME() { return 0; }
-int dummy___FD_SET_chk() { return 0; }
 int dummy___cmsg_nxthdr() { return 0; }
 int dummy___ctype_get_mb_cur_max() { return 0; }
 int dummy___cxa_atexit() { return 0; }
 int dummy___cxa_finalize() { return 0; }
-int dummy___fread_chk() { return 0; }
-int dummy___fwrite_chk() { return 0; }
-int dummy___memchr_chk() { return 0; }
-int dummy___memcpy_chk() { return 0; }
-int dummy___memmove_chk() { return 0; }
-int dummy___memset_chk() { return 0; }
 int dummy___open_2() { return 0; }
-int dummy___poll_chk() { return 0; }
-int dummy___read_chk() { return 0; }
 int dummy___register_atfork() { return 0; }
 int dummy___sF() { return 0; }
 int dummy___stack_chk_fail() { return 0; }
-int dummy___strchr_chk() { return 0; }
-int dummy___strcpy_chk() { return 0; }
-int dummy___strlen_chk() { return 0; }
-int dummy___strncpy_chk() { return 0; }
-int dummy___strncpy_chk2() { return 0; }
 int dummy___system_property_get() { return 0; }
-int dummy___vsnprintf_chk() { return 0; }
-int dummy___vsprintf_chk() { return 0; }
-int dummy___write_chk() { return 0; }
 int dummy_accept4() { return 0; }
 int dummy_android_set_abort_message() { return 0; }
 int dummy_deflateReset() { return 0; }
-int dummy_dl_iterate_phdr() { return 0; }
 int dummy_eventfd() { return 0; }
 int dummy_freeifaddrs() { return 0; }
 int dummy_freelocale() { return 0; }
-int dummy_fseeko() { return 0; }
-int dummy_ftello() { return 0; }
 int dummy_gai_strerror() { return 0; }
 int dummy_getauxval() { return 0; }
 int dummy_getentropy() { return 0; }
@@ -169,19 +175,15 @@ int dummy_gmtime_r() { return 0; }
 int dummy_if_nametoindex() { return 0; }
 int dummy_inflateReset() { return 0; }
 int dummy_inflateReset2() { return 0; }
-int dummy_log10f() { return 0; }
 int dummy_mbrlen() { return 0; }
 int dummy_mbsrtowcs() { return 0; }
 int dummy_mbtowc() { return 0; }
 int dummy_mlock() { return 0; }
 int dummy_newlocale() { return 0; }
-int dummy_poll() { return 0; }
 int dummy_recvmmsg() { return 0; }
-int dummy_select() { return 0; }
 int dummy_sendmmsg() { return 0; }
 int dummy_shutdown() { return 0; }
 int dummy_sigaltstack() { return 0; }
-int dummy_signal() { return 0; }
 int dummy_sincosf() { return 0; }
 int dummy_slCreateEngine() { return 0; }
 int dummy_socketpair() { return 0; }
@@ -200,7 +202,6 @@ int dummy_strxfrm_l() { return 0; }
 int dummy_swprintf() { return 0; }
 int dummy_syscall() { return 0; }
 int dummy_uselocale() { return 0; }
-int dummy_vasprintf() { return 0; }
 int dummy_vfprintf() { return 0; }
 int dummy_wcscoll_l() { return 0; }
 int dummy_wcstold() { return 0; }
@@ -248,7 +249,7 @@ DynLibFunction dynlib_functions[] = {
   {"SL_IID_PLAY", (uintptr_t)&dummy_SL_IID_PLAY},
   {"SL_IID_SEEK", (uintptr_t)&dummy_SL_IID_SEEK},
   {"SL_IID_VOLUME", (uintptr_t)&dummy_SL_IID_VOLUME},
-  {"__FD_SET_chk", (uintptr_t)&dummy___FD_SET_chk},
+  {"__FD_SET_chk", (uintptr_t)&fake___FD_SET_chk},
   {"__android_log_print", (uintptr_t)&__android_log_print},
   {"__android_log_write", (uintptr_t)&__android_log_write},
   {"__cmsg_nxthdr", (uintptr_t)&dummy___cmsg_nxthdr},
@@ -256,27 +257,27 @@ DynLibFunction dynlib_functions[] = {
   {"__cxa_atexit", (uintptr_t)&dummy___cxa_atexit},
   {"__cxa_finalize", (uintptr_t)&dummy___cxa_finalize},
   {"__errno", (uintptr_t)&fake___errno},
-  {"__fread_chk", (uintptr_t)&dummy___fread_chk},
-  {"__fwrite_chk", (uintptr_t)&dummy___fwrite_chk},
-  {"__memchr_chk", (uintptr_t)&dummy___memchr_chk},
-  {"__memcpy_chk", (uintptr_t)&dummy___memcpy_chk},
-  {"__memmove_chk", (uintptr_t)&dummy___memmove_chk},
-  {"__memset_chk", (uintptr_t)&dummy___memset_chk},
+  {"__fread_chk", (uintptr_t)&fake___fread_chk},
+  {"__fwrite_chk", (uintptr_t)&fake___fwrite_chk},
+  {"__memchr_chk", (uintptr_t)&fake___memchr_chk},
+  {"__memcpy_chk", (uintptr_t)&fake___memcpy_chk},
+  {"__memmove_chk", (uintptr_t)&fake___memmove_chk},
+  {"__memset_chk", (uintptr_t)&fake___memset_chk},
   {"__open_2", (uintptr_t)&dummy___open_2},
-  {"__poll_chk", (uintptr_t)&dummy___poll_chk},
-  {"__read_chk", (uintptr_t)&dummy___read_chk},
+  {"__poll_chk", (uintptr_t)&fake___poll_chk},
+  {"__read_chk", (uintptr_t)&fake___read_chk},
   {"__register_atfork", (uintptr_t)&dummy___register_atfork},
   {"__sF", (uintptr_t)&fake_sF},
   {"__stack_chk_fail", (uintptr_t)&dummy___stack_chk_fail},
-  {"__strchr_chk", (uintptr_t)&dummy___strchr_chk},
-  {"__strcpy_chk", (uintptr_t)&dummy___strcpy_chk},
-  {"__strlen_chk", (uintptr_t)&dummy___strlen_chk},
-  {"__strncpy_chk", (uintptr_t)&dummy___strncpy_chk},
-  {"__strncpy_chk2", (uintptr_t)&dummy___strncpy_chk2},
+  {"__strchr_chk", (uintptr_t)&fake___strchr_chk},
+  {"__strcpy_chk", (uintptr_t)&fake___strcpy_chk},
+  {"__strlen_chk", (uintptr_t)&fake___strlen_chk},
+  {"__strncpy_chk", (uintptr_t)&fake___strncpy_chk},
+  {"__strncpy_chk2", (uintptr_t)&fake___strncpy_chk2},
   {"__system_property_get", (uintptr_t)&dummy___system_property_get},
-  {"__vsnprintf_chk", (uintptr_t)&dummy___vsnprintf_chk},
-  {"__vsprintf_chk", (uintptr_t)&dummy___vsprintf_chk},
-  {"__write_chk", (uintptr_t)&dummy___write_chk},
+  {"__vsnprintf_chk", (uintptr_t)&fake___vsnprintf_chk},
+  {"__vsprintf_chk", (uintptr_t)&fake___vsprintf_chk},
+  {"__write_chk", (uintptr_t)&fake___write_chk},
   {"abort", (uintptr_t)&abort},
   {"accept", (uintptr_t)&accept},
   {"accept4", (uintptr_t)&dummy_accept4},
@@ -301,7 +302,7 @@ DynLibFunction dynlib_functions[] = {
   {"deflateEnd", (uintptr_t)&deflateEnd},
   {"deflateInit2_", (uintptr_t)&deflateInit2_},
   {"deflateReset", (uintptr_t)&dummy_deflateReset},
-  {"dl_iterate_phdr", (uintptr_t)&dummy_dl_iterate_phdr},
+  {"dl_iterate_phdr", (uintptr_t)&dl_iterate_phdr},
   {"dlclose", (uintptr_t)&dlclose},
   {"dlerror", (uintptr_t)&dlerror},
   {"dlopen", (uintptr_t)&dlopen},
@@ -341,10 +342,10 @@ DynLibFunction dynlib_functions[] = {
   {"freelocale", (uintptr_t)&dummy_freelocale},
   {"frexp", (uintptr_t)&frexp},
   {"fseek", (uintptr_t)&fseek},
-  {"fseeko", (uintptr_t)&dummy_fseeko},
+  {"fseeko", (uintptr_t)&fseeko},
   {"fstat", (uintptr_t)&fstat},
   {"ftell", (uintptr_t)&ftell},
-  {"ftello", (uintptr_t)&dummy_ftello},
+  {"ftello", (uintptr_t)&ftello},
   {"fwrite", (uintptr_t)&fwrite},
   {"gai_strerror", (uintptr_t)&dummy_gai_strerror},
   {"getaddrinfo", (uintptr_t)&getaddrinfo},
@@ -451,7 +452,7 @@ DynLibFunction dynlib_functions[] = {
   {"listen", (uintptr_t)&listen},
   {"localeconv", (uintptr_t)&localeconv},
   {"localtime", (uintptr_t)&localtime},
-  {"log10f", (uintptr_t)&dummy_log10f},
+  {"log10f", (uintptr_t)&log10f},
   {"longjmp", (uintptr_t)&longjmp},
   {"lseek", (uintptr_t)&lseek},
   {"madvise", (uintptr_t)&madvise},
@@ -480,7 +481,7 @@ DynLibFunction dynlib_functions[] = {
   {"opendir", (uintptr_t)&opendir},
   {"openlog", (uintptr_t)&openlog},
   {"pipe", (uintptr_t)&pipe},
-  {"poll", (uintptr_t)&dummy_poll},
+  {"poll", (uintptr_t)&poll},
   {"posix_memalign", (uintptr_t)&posix_memalign},
   {"pow", (uintptr_t)&pow},
   {"printf", (uintptr_t)&printf},
@@ -528,7 +529,7 @@ DynLibFunction dynlib_functions[] = {
   {"remove", (uintptr_t)&remove},
   {"rename", (uintptr_t)&rename},
   {"sched_yield", (uintptr_t)&sched_yield},
-  {"select", (uintptr_t)&dummy_select},
+  {"select", (uintptr_t)&select},
   {"sendmmsg", (uintptr_t)&dummy_sendmmsg},
   {"sendto", (uintptr_t)&sendto},
   {"setjmp", (uintptr_t)&setjmp},
@@ -539,7 +540,7 @@ DynLibFunction dynlib_functions[] = {
   {"sigaction", (uintptr_t)&sigaction},
   {"sigaltstack", (uintptr_t)&dummy_sigaltstack},
   {"sigemptyset", (uintptr_t)&sigemptyset},
-  {"signal", (uintptr_t)&dummy_signal},
+  {"signal", (uintptr_t)&signal},
   {"sincosf", (uintptr_t)&dummy_sincosf},
   {"sinf", (uintptr_t)&sinf},
   {"slCreateEngine", (uintptr_t)&dummy_slCreateEngine},
@@ -593,7 +594,7 @@ DynLibFunction dynlib_functions[] = {
   {"unlink", (uintptr_t)&unlink},
   {"uselocale", (uintptr_t)&dummy_uselocale},
   {"usleep", (uintptr_t)&usleep},
-  {"vasprintf", (uintptr_t)&dummy_vasprintf},
+  {"vasprintf", (uintptr_t)&vasprintf},
   {"vfprintf", (uintptr_t)&dummy_vfprintf},
   {"vsnprintf", (uintptr_t)&vsnprintf},
   {"vsscanf", (uintptr_t)&vsscanf},
