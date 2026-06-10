@@ -876,3 +876,86 @@ DynLibFunction dynlib_functions[] = {
   {"atoi", (uintptr_t)&atoi},
   {"__system_property_get", (uintptr_t)&dummy___system_property_get},
   {"wcstoll", (uintptr_t)&dummy_wcstoll},
+};
+
+const int dynlib_functions_count = sizeof(dynlib_functions) / sizeof(dynlib_functions[0]);
+
+// --- RESTORED IMPLEMENTATIONS ---
+#include <stdarg.h>
+#include <assert.h>
+
+int ret0(void) { return 0; }
+
+int __android_log_print(int prio, const char* tag, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    printf("\n");
+    va_end(ap);
+    return 1;
+}
+
+int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap) {
+    vprintf(fmt, ap);
+    printf("\n");
+    return 1;
+}
+
+static uint8_t fake_sF[3][0x100];
+
+void __assert2(const char *file, int line, const char *func, const char *expr) {
+    printf("assertion failed:\n%s:%d (%s): %s\n", file, line, func, expr);
+    assert(0);
+}
+
+typedef struct AAsset {
+    FILE *fp;
+    long length;
+} AAsset;
+
+void* fake_AAssetManager_open(void* mgr, const char* filename, int mode) {
+    debugPrintf("AAssetManager_open: %s\n", filename);
+    char path[256];
+    snprintf(path, sizeof(path), "assets/%s", filename);
+    FILE *fp = fopen(path, "rb");
+    if (!fp) return NULL;
+    AAsset *asset = (AAsset*)malloc(sizeof(AAsset));
+    asset->fp = fp;
+    fseek(fp, 0, SEEK_END);
+    asset->length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    return asset;
+}
+
+int fake_AAsset_read(AAsset *asset, void *buf, size_t count) {
+    if (!asset || !asset->fp) return -1;
+    return fread(buf, 1, count, asset->fp);
+}
+
+long fake_AAsset_seek(AAsset *asset, long offset, int whence) {
+    if (!asset || !asset->fp) return -1;
+    fseek(asset->fp, offset, whence);
+    return ftell(asset->fp);
+}
+
+void fake_AAsset_close(AAsset *asset) {
+    if (!asset) return;
+    if (asset->fp) fclose(asset->fp);
+    free(asset);
+}
+
+long fake_AAsset_getLength(AAsset *asset) {
+    if (!asset) return 0;
+    return asset->length;
+}
+
+long fake_AAsset_getRemainingLength(AAsset *asset) {
+    if (!asset || !asset->fp) return 0;
+    long pos = ftell(asset->fp);
+    return asset->length - pos;
+}
+
+int fake_AAsset_openFileDescriptor(AAsset *asset, long *outStart, long *outLength) {
+    debugPrintf("fake_AAsset_openFileDescriptor\n");
+    return -1;
+}
