@@ -210,15 +210,13 @@ int __android_log_print(int prio, const char* tag, const char* fmt, ...) {
     va_list ap;
     va_start(ap, fmt);
     vprintf(fmt, ap);
-    printf("
-");
+    printf("\n");
     va_end(ap);
     return 1;
 }
 int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap) {
     vprintf(fmt, ap);
-    printf("
-");
+    printf("\n");
     return 1;
 }
 int __android_log_write(int prio, const char* tag, const char* text) {
@@ -242,8 +240,7 @@ void __stack_chk_fail(void);
 static uint8_t fake_sF[3][0x100];
 
 void __assert2(const char *file, int line, const char *func, const char *expr) {
-    printf("assertion failed:
-%s:%d (%s): %s\n", file, line, func, expr);
+    printf("assertion failed:\n%s:%d (%s): %s\n", file, line, func, expr);
     assert(0);
 }
 
@@ -319,14 +316,12 @@ typedef struct AAsset {
 } AAsset;
 
 static void *fake_AAssetManager_fromJava(void *env, void *assetManager) {
-    debugPrintf("AAssetManager_fromJava called
-");
+    debugPrintf("AAssetManager_fromJava called\n");
     return (void*)0x1234; // return a dummy manager pointer
 }
 
 FILE *hook_fopen(const char *pathname, const char *mode) {
-    debugPrintf("fopen called for: %s (mode: %s)
-", pathname, mode);
+    debugPrintf("fopen called for: %s (mode: %s)\n", pathname, mode);
     FILE *fp = fopen(pathname, mode);
     if (!fp) {
         char path[512];
@@ -357,14 +352,12 @@ static AAsset *fake_AAssetManager_open(void *mgr, const char *filename, int mode
     AAsset *asset = malloc(sizeof(AAsset));
     asset->fp = fp;
     asset->length = length;
-    debugPrintf("Returning AAsset* %p
-", asset);
+    debugPrintf("Returning AAsset* %p\n", asset);
     return asset;
 }
 
 static int fake_AAsset_read(AAsset *asset, void *buf, size_t count) {
-    debugPrintf("AAsset_read called: count=%zu
-", count);
+    debugPrintf("AAsset_read called: count=%zu\n", count);
     if (!asset || !asset->fp) return -1;
     // For debugging: only return 10 bytes to see if it changes the crash
     size_t to_read = count > 10 ? 10 : count;
@@ -378,39 +371,34 @@ static int fake_AAsset_read(AAsset *asset, void *buf, size_t count) {
 }
 
 static off_t fake_AAsset_seek(AAsset *asset, off_t offset, int whence) {
-    debugPrintf("AAsset_seek called: offset=%ld, whence=%d
-", (long)offset, whence);
+    debugPrintf("AAsset_seek called: offset=%ld, whence=%d\n", (long)offset, whence);
     if (!asset || !asset->fp) return -1;
     fseek(asset->fp, offset, whence);
     return ftell(asset->fp);
 }
 
 static void fake_AAsset_close(AAsset *asset) {
-    debugPrintf("AAsset_close called
-");
+    debugPrintf("AAsset_close called\n");
     if (!asset) return;
     if (asset->fp) fclose(asset->fp);
     free(asset);
 }
 
 static off_t fake_AAsset_getLength(AAsset *asset) {
-    debugPrintf("AAsset_getLength called
-");
+    debugPrintf("AAsset_getLength called\n");
     if (!asset) return 0;
     return asset->length;
 }
 
 static off_t fake_AAsset_getRemainingLength(AAsset *asset) {
-    debugPrintf("AAsset_getRemainingLength called
-");
+    debugPrintf("AAsset_getRemainingLength called\n");
     if (!asset || !asset->fp) return 0;
     long current = ftell(asset->fp);
     return asset->length - current;
 }
 
 static int fake_AAsset_openFileDescriptor(AAsset *asset, off_t *outStart, off_t *outLength) {
-    debugPrintf("AAsset_openFileDescriptor called
-");
+    debugPrintf("AAsset_openFileDescriptor called\n");
     if (!asset || !asset->fp) return -1;
     int fd = fileno(asset->fp);
     int new_fd = dup(fd); // dup so when AAsset_close is called, the game can still read from this fd
@@ -451,8 +439,7 @@ int pthread_once_fake(volatile int *once_control, void (*init_routine)(void)) {
 }
 
 int pthread_create_fake(pthread_t *thread, const void *attr, void *(*start_routine) (void *), void *arg) {
-    debugPrintf("pthread_create called: start_routine=%p
-", start_routine);
+    debugPrintf("pthread_create called: start_routine=%p\n", start_routine);
     return pthread_create(thread, NULL, start_routine, arg);
 }
 
