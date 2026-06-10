@@ -22,8 +22,13 @@ set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g ${ARCH_FLAGS}")
 set(SOURCES
     src/main.c
     src/so_util.c
-    src/imports.c
-    src/imports_extra.c
+    src/imports.gen.c
+    src/android_shim.c
+    src/jni_shim.c
+    src/egl_shim.c
+    src/opensles_shim.c
+    src/util.c
+    src/error.c
 )
 
 add_executable(${TARGET_NAME} ${SOURCES})
@@ -45,4 +50,5 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     dl
     z
     pthread
+    stdc++
 )
