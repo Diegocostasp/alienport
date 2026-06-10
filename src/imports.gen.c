@@ -18,10 +18,24 @@
 #include <stdio.h>
 
 #include <stdarg.h>
-int __android_log_print(int prio, const char* tag, const char* fmt, ...);
-int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap);
-int __android_log_write(int prio, const char* tag, const char* text);
-void *eglQueryString_shim(void *dpy, int name);
+int __android_log_print(int prio, const char* tag, const char* fmt, ...) {
+    va_list ap;
+    va_start(ap, fmt);
+    vprintf(fmt, ap);
+    printf("\n");
+    va_end(ap);
+    return 1;
+}
+int __android_log_vprint(int prio, const char* tag, const char* fmt, va_list ap) {
+    vprintf(fmt, ap);
+    printf("\n");
+    return 1;
+}
+int __android_log_write(int prio, const char* tag, const char* text) {
+    printf("%s\n", text);
+    return 1;
+}
+
 
 
 #include <zlib.h>
@@ -314,7 +328,7 @@ DynLibFunction dynlib_functions[] = {
 
   {"deflateInit2_", (uintptr_t)&deflateInit2_},  // pass
 
-  {"eglQueryString", (uintptr_t)&eglQueryString_shim},  // egl_shim
+  {"eglQueryString", (uintptr_t)&egl_shim_QueryString},  // libEGLegl_shim
 
   {"exit", (uintptr_t)&exit},  // pass
 
@@ -749,3 +763,4 @@ DynLibFunction dynlib_functions[] = {
 };
 
 const int dynlib_functions_count = sizeof(dynlib_functions)/sizeof(dynlib_functions[0]);
+size_t dynlib_numfunctions = sizeof(dynlib_functions) / sizeof(DynLibFunction);
