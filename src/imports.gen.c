@@ -2,6 +2,9 @@
 #include "imports.h"
 #include "so_util.h"
 #include "egl_shim.h"
+#include "opensles_shim.h"
+#include <sys/auxv.h>
+extern int __cxa_atexit(void (*)(void*), void*, void*);
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
