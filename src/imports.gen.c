@@ -289,8 +289,7 @@ int fake_pthread_create(pthread_t *thread, void *attr, void *(*start_routine) (v
     return pthread_create(thread, real_attr, start_routine, arg);
 }
 
-void init_imports() {
-dynlib_functions[] = {
+DynLibFunction dynlib_functions[] = {
   {"AAssetManager_open", (uintptr_t)&fake_AAssetManager_open},
   {"AAsset_close", (uintptr_t)&fake_AAsset_close},
   {"AAsset_getLength", (uintptr_t)&fake_AAsset_getLength},
