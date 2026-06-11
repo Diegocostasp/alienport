@@ -35,6 +35,12 @@ add_executable(${TARGET_NAME} ${SOURCES})
 target_compile_definitions(${TARGET_NAME} PRIVATE ${PLATFORM_DEFINES})
 target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
+# Biblioteca LD_PRELOAD para corrigir pthread em libsyberia1.so
+add_library(pthread_preload SHARED src/pthread_preload.c)
+target_compile_options(pthread_preload PRIVATE -fPIC -Wall -O2)
+target_link_libraries(pthread_preload PRIVATE dl pthread)
+
+
 # Dependencies via pkg-config
 find_package(PkgConfig REQUIRED)
 
