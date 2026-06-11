@@ -41,7 +41,7 @@ static FakeInputEvent *g_current_event = NULL; // event being processed
 // Virtual cursor for analog stick → touch mapping
 static float g_cursor_x = SCREEN_WIDTH / 2.0f;
 static float g_cursor_y = SCREEN_HEIGHT / 2.0f;
-static int g_cursor_down = 0; // whether virtual "finger" is down
+static int __attribute__((unused)) g_cursor_down = 0; // whether virtual "finger" is down
 
 // Last sent joystick axis values (to avoid flooding)
 static float g_last_lx = 0, g_last_ly = 0, g_last_rx = 0, g_last_ry = 0;
@@ -98,7 +98,7 @@ static void push_key_event(int action, int keycode) {
 
 /* ---- Push motion (touch) event ---- */
 
-static void push_motion_event(int action, float x, float y) {
+static void __attribute__((unused)) push_motion_event(int action, float x, float y) {
   FakeInputEvent ev;
   memset(&ev, 0, sizeof(ev));
   ev.type = AINPUT_EVENT_TYPE_MOTION;
