@@ -9,10 +9,10 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <ucontext.h>
+#include <unistd.h>
 
 #include "android_shim.h"
 #include "error.h"
@@ -41,7 +41,7 @@ static int try_skip_sentinel_crash(ucontext_t *uc, uintptr_t fault_addr) {
 
   // Case 1: BLR / BR jumped to an invalid address (PC itself is small)
   if (pc < 0x10000) {
-    uc->uc_mcontext.regs[0] = 0;           // fake return value = NULL
+    uc->uc_mcontext.regs[0] = 0;                   // fake return value = NULL
     uc->uc_mcontext.pc = uc->uc_mcontext.regs[30]; // return to caller (LR)
     return 1;
   }
@@ -50,7 +50,8 @@ static int try_skip_sentinel_crash(ucontext_t *uc, uintptr_t fault_addr) {
   // Return to the .so caller with x0=0 (fake success/NULL).
   if (fault_addr < 0x10000 && (pc < text || pc >= text + text_size)) {
     uintptr_t lr = uc->uc_mcontext.regs[30];
-    fprintf(stderr, "[sentinel-skip] syslib crash at %p, fault 0x%lx → ret to LR %p\n",
+    fprintf(stderr,
+            "[sentinel-skip] syslib crash at %p, fault 0x%lx → ret to LR %p\n",
             (void *)pc, (unsigned long)fault_addr, (void *)lr);
     uc->uc_mcontext.regs[0] = 0;
     uc->uc_mcontext.pc = lr;
@@ -66,14 +67,14 @@ static int try_skip_sentinel_crash(ucontext_t *uc, uintptr_t fault_addr) {
   // Guard against infinite skip loops (same region crashing repeatedly)
   if (pc == last_recovery_pc) {
     if (++recovery_streak > MAX_RECOVERY_STREAK)
-      return 0;  // give up, let it crash
+      return 0; // give up, let it crash
   } else {
     last_recovery_pc = pc;
     recovery_streak = 1;
   }
 
   uint32_t insn = *(uint32_t *)pc;
-  int rt  = insn & 0x1F;         // bits [4:0]
+  int rt = insn & 0x1F;          // bits [4:0]
   int rt2 = (insn >> 10) & 0x1F; // bits [14:10] (for LDP)
 
   int is_load = 0, is_store = 0, is_pair = 0;
@@ -82,27 +83,27 @@ static int try_skip_sentinel_crash(ucontext_t *uc, uintptr_t fault_addr) {
   //   V=bit26, opc=bits[23:22]: 00=STR, 01=LDR, 10=LDRSW, 11=PRFM/LDR(SIMD)
   if ((insn & 0x3B000000) == 0x39000000) {
     int opc = (insn >> 22) & 3;
-    is_load  = (opc >= 1);
+    is_load = (opc >= 1);
     is_store = (opc == 0);
   }
   // LDUR/STUR (unscaled immediate): xx 111 x 00 xx 0 imm9 00 Rn Rt
   else if ((insn & 0x3B200C00) == 0x38000000) {
     int opc = (insn >> 22) & 3;
-    is_load  = (opc >= 1);
+    is_load = (opc >= 1);
     is_store = (opc == 0);
   }
   // LDR/STR (register offset): xx 111 x 00 xx 1 Rm opt S 10 Rn Rt
   else if ((insn & 0x3B200C00) == 0x38200800) {
     int opc = (insn >> 22) & 3;
-    is_load  = (opc >= 1);
+    is_load = (opc >= 1);
     is_store = (opc == 0);
   }
   // LDP/STP (various): xx 101 x 0xx x imm7 Rt2 Rn Rt
   else if ((insn & 0x3A000000) == 0x28000000) {
     int L = (insn >> 22) & 1;
-    is_load  = L;
+    is_load = L;
     is_store = !L;
-    is_pair  = 1;
+    is_pair = 1;
   }
 
   if (is_load) {
@@ -126,8 +127,8 @@ static int try_skip_sentinel_crash(ucontext_t *uc, uintptr_t fault_addr) {
   // Unknown instruction but fault_addr < 0x10000 and PC is in .so:
   // skip it and hope for the best
   uc->uc_mcontext.pc += 4;
-  fprintf(stderr, "[sentinel-skip] insn 0x%08x at .so+0x%lx → skip\n",
-          insn, (unsigned long)(pc - text));
+  fprintf(stderr, "[sentinel-skip] insn 0x%08x at .so+0x%lx → skip\n", insn,
+          (unsigned long)(pc - text));
   return 1;
 }
 
@@ -139,7 +140,7 @@ static void crash_handler(int sig, siginfo_t *info, void *uctx) {
   // Try automatic sentinel-crash recovery first (silent on success)
   if ((sig == SIGSEGV || sig == SIGBUS) &&
       try_skip_sentinel_crash(uc, fault_addr)) {
-    return;  // resume execution at adjusted PC
+    return; // resume execution at adjusted PC
   }
 
   uintptr_t text = (uintptr_t)text_base;
@@ -147,7 +148,10 @@ static void crash_handler(int sig, siginfo_t *info, void *uctx) {
 
   fprintf(stderr, "\n=== CRASH ===\n");
   fprintf(stderr, "Signal: %d (%s)\n", sig,
-          sig == SIGSEGV ? "SIGSEGV" : sig == SIGBUS ? "SIGBUS" : sig == SIGABRT ? "SIGABRT" : "?");
+          sig == SIGSEGV   ? "SIGSEGV"
+          : sig == SIGBUS  ? "SIGBUS"
+          : sig == SIGABRT ? "SIGABRT"
+                           : "?");
   fprintf(stderr, "Fault addr: %p\n", (void *)fault_addr);
   fprintf(stderr, "PC:         %p\n", (void *)pc);
 
@@ -160,7 +164,8 @@ static void crash_handler(int sig, siginfo_t *info, void *uctx) {
 
   fprintf(stderr, "\nRegisters:\n");
   for (int i = 0; i < 31; i++) {
-    fprintf(stderr, "  x%-2d = 0x%016lx", i, (unsigned long)uc->uc_mcontext.regs[i]);
+    fprintf(stderr, "  x%-2d = 0x%016lx", i,
+            (unsigned long)uc->uc_mcontext.regs[i]);
     if (i % 3 == 2 || i == 30)
       fprintf(stderr, "\n");
   }
@@ -393,11 +398,11 @@ int main(int argc, char *argv[]) {
   // Hook buttonLayout via GOT to return NULL for missing layouts.
   // Patching GOT (data segment, RW) avoids instruction cache issues.
   {
-    uintptr_t got_slot = so_find_rel_addr_safe(
-        "_ZN8TeLuaGUI12buttonLayoutERK8TeString");
+    uintptr_t got_slot =
+        so_find_rel_addr_safe("_ZN8TeLuaGUI12buttonLayoutERK8TeString");
     if (got_slot) {
       uintptr_t *slot = (uintptr_t *)got_slot;
-      orig_buttonLayout = (void *(*)(void *, const void *))*slot;
+      orig_buttonLayout = (void *(*)(void *, const void *)) * slot;
       *slot = (uintptr_t)buttonLayout_wrapper;
       debugPrintf("GOT-hooked buttonLayout: orig=%p wrapper=%p\n",
                   (void *)orig_buttonLayout, (void *)buttonLayout_wrapper);
@@ -408,11 +413,11 @@ int main(int argc, char *argv[]) {
 
   // Hook layout() too — same invalid pointer issue
   {
-    uintptr_t got_slot = so_find_rel_addr_safe(
-        "_ZN8TeLuaGUI6layoutERK8TeString");
+    uintptr_t got_slot =
+        so_find_rel_addr_safe("_ZN8TeLuaGUI6layoutERK8TeString");
     if (got_slot) {
       uintptr_t *slot = (uintptr_t *)got_slot;
-      orig_layout = (void *(*)(void *, const void *))*slot;
+      orig_layout = (void *(*)(void *, const void *)) * slot;
       *slot = (uintptr_t)layout_wrapper;
       debugPrintf("GOT-hooked layout: orig=%p wrapper=%p\n",
                   (void *)orig_layout, (void *)layout_wrapper);
@@ -423,8 +428,7 @@ int main(int argc, char *argv[]) {
   // They can crash accessing corrupted TeButtonLayout objects from missing
   // gamepad UI layouts. The wrapper catches the crash via sigsetjmp.
   {
-    uintptr_t got_slot = so_find_rel_addr_safe(
-        "_ZN9PadScheme8updateUpEj");
+    uintptr_t got_slot = so_find_rel_addr_safe("_ZN9PadScheme8updateUpEj");
     if (got_slot) {
       uintptr_t *slot = (uintptr_t *)got_slot;
       orig_updateUp = (int (*)(void *, unsigned int))*slot;
@@ -433,8 +437,7 @@ int main(int argc, char *argv[]) {
     }
   }
   {
-    uintptr_t got_slot = so_find_rel_addr_safe(
-        "_ZN9PadScheme10updateDownEj");
+    uintptr_t got_slot = so_find_rel_addr_safe("_ZN9PadScheme10updateDownEj");
     if (got_slot) {
       uintptr_t *slot = (uintptr_t *)got_slot;
       orig_updateDown = (int (*)(void *, unsigned int))*slot;
@@ -478,25 +481,26 @@ int main(int argc, char *argv[]) {
 
   // Call ANativeActivity_onCreate
   debugPrintf("Calling ANativeActivity_onCreate...\n");
-  void (*create_func)(ANativeActivity*, void*, size_t) =
-      (void (*)(ANativeActivity*, void*, size_t))create_addr;
+  void (*create_func)(ANativeActivity *, void *, size_t) =
+      (void (*)(ANativeActivity *, void *, size_t))create_addr;
   create_func(app->activity, NULL, 0);
 
   // Send initial lifecycle commands
   if (app->activity->callbacks && app->activity->callbacks->onStart)
-      app->activity->callbacks->onStart(app->activity);
+    app->activity->callbacks->onStart(app->activity);
   if (app->activity->callbacks && app->activity->callbacks->onResume)
-      app->activity->callbacks->onResume(app->activity);
-  if (app->activity->callbacks && app->activity->callbacks->onNativeWindowCreated)
-      app->activity->callbacks->onNativeWindowCreated(app->activity, app->window);
+    app->activity->callbacks->onResume(app->activity);
+  if (app->activity->callbacks &&
+      app->activity->callbacks->onNativeWindowCreated)
+    app->activity->callbacks->onNativeWindowCreated(app->activity, app->window);
 
   debugPrintf("Game started! Waiting in main thread...\n");
-  
-  // Keep the main thread alive since ANativeActivity_onCreate returns immediately
-  // and the game runs in its own thread.
-  #include <unistd.h>
+
+// Keep the main thread alive since ANativeActivity_onCreate returns immediately
+// and the game runs in its own thread.
+#include <unistd.h>
   while (!app->destroyRequested) {
-      usleep(100000); // sleep for 100ms
+    usleep(100000); // sleep for 100ms
   }
 
   debugPrintf("android_main returned\n");
