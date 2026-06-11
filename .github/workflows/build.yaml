@@ -26,4 +26,6 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: alienport-binary
-        path: alienport
+        path: |
+          alienport
+          libpthread_preload.so
