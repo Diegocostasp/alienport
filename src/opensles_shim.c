@@ -257,8 +257,9 @@ static void sdl_audio_callback(void *userdata, Uint8 *stream, int len) {
     if (vol < 0.0f || vol > 2.0f || vol != vol /* NaN */) {
       static uint32_t vol_warn = 0;
       if (vol_warn < 20) {
+        union { float f; uint32_t u; } vu = { .f = vol };
         debugPrintf("opensles_shim: CORRUPT vol player %d: volume=%f (raw bits=0x%08x)\n",
-                    i, vol, *(uint32_t*)&vol);
+                    i, vol, vu.u);
         vol_warn++;
       }
       vol = 0.0f; /* mute corrupted player */
