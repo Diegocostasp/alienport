@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(AlienShooterPort VERSION 1.0.0 LANGUAGES C)
+project(AlienShooterPort VERSION 1.2.9 LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -15,8 +15,8 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
     set(PLATFORM_DEFINES "-D__LINUX__")
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall -O2 -ffunction-sections ${ARCH_FLAGS}")
-set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -g ${ARCH_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -ffunction-sections -fdata-sections -Wall -Wno-unused-function ${ARCH_FLAGS}")
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections ${ARCH_FLAGS}")
 
 # Sources
 set(SOURCES
@@ -24,24 +24,19 @@ set(SOURCES
     src/so_util.c
     src/imports.gen.c
     src/android_shim.c
+    src/asset_shim.c
+    src/bionic_shims.c
     src/jni_shim.c
     src/egl_shim.c
     src/opensles_shim.c
-    src/util.c
-    src/error.c
+    src/pthread_bridge.c
 )
 
 add_executable(${TARGET_NAME} ${SOURCES})
-target_compile_definitions(${TARGET_NAME} PRIVATE ${PLATFORM_DEFINES})
+target_compile_definitions(${TARGET_NAME} PRIVATE ${PLATFORM_DEFINES} _GNU_SOURCE)
 target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
 
-# Biblioteca LD_PRELOAD para corrigir pthread em libsyberia1.so
-add_library(pthread_preload SHARED src/pthread_preload.c)
-target_compile_options(pthread_preload PRIVATE -fPIC -Wall -O2)
-target_link_libraries(pthread_preload PRIVATE dl pthread)
-
-
-# Dependencies via pkg-config
+# Dependencies
 find_package(PkgConfig REQUIRED)
 
 pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
@@ -56,5 +51,4 @@ target_link_libraries(${TARGET_NAME} PRIVATE
     dl
     z
     pthread
-    stdc++
 )
