@@ -5,7 +5,9 @@
  * falso Android + JNI, e gerencia o ciclo de vida do jogo no R36S.
  */
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>

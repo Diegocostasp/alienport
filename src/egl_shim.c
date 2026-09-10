@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "egl_shim.h"
 #include <GLES2/gl2.h>
 #include <pthread.h>

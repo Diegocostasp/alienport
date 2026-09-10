@@ -1,4 +1,6 @@
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 #include "android_shim.h"
 #include "asset_shim.h"
 #include "egl_shim.h"
