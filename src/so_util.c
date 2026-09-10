@@ -1,22 +1,19 @@
 /*
- * so_util.c -- utils to load and hook .so modules
+ * so_util.c -- Carregador ELF ARM64 para libalien_shooter.so
  *
- * Based on max_arm64 by Jaakko Lukkari / fgsfds / Andy Nguyen
+ * Baseado na implementação comprovada de Beach Buggy Racing / reVC / Syberia.
  */
 
+#include "so_util.h"
 #include <assert.h>
+#include <dlfcn.h>
 #include <elf.h>
 #include <errno.h>
-#include <malloc.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-#include "error.h"
-#include "so_util.h"
-#include "util.h"
 
 #ifndef EM_AARCH64
 #define EM_AARCH64 183
@@ -43,87 +40,49 @@ static char *shstrtab;
 static char *dynstrtab;
 
 void hook_arm64(uintptr_t addr, uintptr_t dst) {
-  if (addr == 0)
-    return;
+  if (addr == 0) return;
   uint32_t *hook = (uint32_t *)addr;
   hook[0] = 0x58000051u; // LDR X17, #0x8
   hook[1] = 0xd61f0220u; // BR X17
   *(uint64_t *)(hook + 2) = dst;
+  __builtin___clear_cache((char *)hook, (char *)hook + 16);
 }
 
 void so_make_text_writable(void) {
   const size_t text_asize = ALIGN_MEM(text_size, 0x1000);
-  if (mprotect(text_virtbase, text_asize,
-               PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
-    debugPrintf("Warning: Could not make text segment writable\n");
-  }
+  mprotect(text_virtbase, text_asize, PROT_READ | PROT_WRITE | PROT_EXEC);
 }
 
 void so_make_text_executable(void) {
   const size_t text_asize = ALIGN_MEM(text_size, 0x1000);
-  if (mprotect(text_virtbase, text_asize, PROT_READ | PROT_EXEC) != 0) {
-    debugPrintf("Warning: Could not restore text segment permissions\n");
-  }
+  mprotect(text_virtbase, text_asize, PROT_READ | PROT_EXEC);
 }
 
 void so_flush_caches(void) {
-  __builtin___clear_cache((char *)load_virtbase,
-                          (char *)load_virtbase + load_size);
+  __builtin___clear_cache((char *)load_virtbase, (char *)load_virtbase + load_size);
 }
 
 void so_free_temp(void) {
-  free(so_base);
-  so_base = NULL;
-}
-
-static inline size_t round_up(size_t x, size_t a) {
-  return (x + a - 1) & ~(a - 1);
-}
-
-static int protect_range(void *start, size_t len, int prot) {
-  int ps = getpagesize();
-  if (ps <= 0)
-    ps = 4096;
-  uintptr_t addr = (uintptr_t)start;
-  uintptr_t page_base = addr & ~((uintptr_t)ps - 1);
-  size_t head = addr - page_base;
-  size_t plen = round_up(len + head, (size_t)ps);
-  if (mprotect((void *)page_base, plen, prot) != 0) {
-    debugPrintf("mprotect(%p, %zu, 0x%x) failed: %s\n", (void *)page_base,
-                plen, prot, strerror(errno));
-    return -1;
-  }
-  return 0;
-}
-
-void so_finalize(void) {
-  if (protect_range(text_virtbase, text_size, PROT_READ | PROT_EXEC) != 0) {
-    fatal_error("Error: could not set RX on text at %p (size %zu)",
-                text_virtbase, text_size);
-  }
-  if (protect_range(data_virtbase, data_size, PROT_READ | PROT_WRITE) != 0) {
-    fatal_error("Error: could not set RW on data at %p (size %zu)",
-                data_virtbase, data_size);
+  if (so_base) {
+    free(so_base);
+    so_base = NULL;
   }
 }
 
 int so_load(const char *filename, void *base, size_t max_size) {
   int res = 0;
   size_t so_size = 0;
-  int text_segno = -1;
-  int data_segno = -1;
 
-  debugPrintf("so_load: Opening %s\n", filename);
+  printf("[so_util] Opening %s\n", filename);
   FILE *fd = fopen(filename, "rb");
-  if (fd == NULL) {
-    debugPrintf("so_load: Failed to open file\n");
+  if (!fd) {
+    fprintf(stderr, "[so_util] Failed to open %s\n", filename);
     return -1;
   }
 
   fseek(fd, 0, SEEK_END);
   so_size = ftell(fd);
   fseek(fd, 0, SEEK_SET);
-  debugPrintf("so_load: File size: %zu bytes\n", so_size);
 
   so_base = malloc(so_size);
   if (!so_base) {
@@ -139,163 +98,99 @@ int so_load(const char *filename, void *base, size_t max_size) {
   fclose(fd);
 
   if (memcmp(so_base, ELFMAG, SELFMAG) != 0) {
-    debugPrintf("so_load: Not a valid ELF file\n");
+    fprintf(stderr, "[so_util] Not a valid ELF file\n");
     res = -1;
     goto err_free_so;
   }
 
   elf_hdr = (Elf64_Ehdr *)so_base;
-
-  if (elf_hdr->e_ident[EI_CLASS] != ELFCLASS64) {
-    debugPrintf("so_load: Not a 64-bit ELF file\n");
-    res = -1;
-    goto err_free_so;
-  }
-
-  if (elf_hdr->e_machine != EM_AARCH64) {
-    debugPrintf("so_load: Not an AArch64 ELF (machine=%d)\n",
-                elf_hdr->e_machine);
-    res = -1;
-    goto err_free_so;
-  }
-
-  debugPrintf("so_load: ELF64 AArch64, %d program headers, %d section headers\n",
-              elf_hdr->e_phnum, elf_hdr->e_shnum);
-
-  if (elf_hdr->e_phoff + (elf_hdr->e_phnum * sizeof(Elf64_Phdr)) > so_size) {
-    debugPrintf("so_load: Program headers extend beyond file\n");
+  if (elf_hdr->e_ident[EI_CLASS] != ELFCLASS64 || elf_hdr->e_machine != EM_AARCH64) {
+    fprintf(stderr, "[so_util] Not an AArch64 ELF file\n");
     res = -1;
     goto err_free_so;
   }
 
   prog_hdr = (Elf64_Phdr *)((uintptr_t)so_base + elf_hdr->e_phoff);
-
-  if (elf_hdr->e_shoff + (elf_hdr->e_shnum * sizeof(Elf64_Shdr)) > so_size) {
-    debugPrintf("so_load: Section headers extend beyond file\n");
-    res = -1;
-    goto err_free_so;
-  }
-
   sec_hdr = (Elf64_Shdr *)((uintptr_t)so_base + elf_hdr->e_shoff);
+  shstrtab = (char *)((uintptr_t)so_base + sec_hdr[elf_hdr->e_shstrndx].sh_offset);
 
-  if (elf_hdr->e_shstrndx >= elf_hdr->e_shnum) {
-    debugPrintf("so_load: Invalid string table index\n");
-    res = -1;
-    goto err_free_so;
-  }
-
-  shstrtab =
-      (char *)((uintptr_t)so_base + sec_hdr[elf_hdr->e_shstrndx].sh_offset);
-
+  size_t max_end = 0;
+  int exec_seg = -1;
   for (int i = 0; i < elf_hdr->e_phnum; i++) {
     if (prog_hdr[i].p_type == PT_LOAD) {
-      const size_t prog_size =
-          ALIGN_MEM(prog_hdr[i].p_memsz, prog_hdr[i].p_align);
-      if ((prog_hdr[i].p_flags & PF_X) == PF_X) {
-        text_segno = i;
-      } else {
-        if (text_segno < 0)
-          goto err_free_so;
-        data_segno = i;
-        load_size = prog_hdr[i].p_vaddr + prog_size;
-      }
+      size_t end = prog_hdr[i].p_vaddr + prog_hdr[i].p_memsz;
+      if (end > max_end) max_end = end;
+      if ((prog_hdr[i].p_flags & PF_X) == PF_X) exec_seg = i;
     }
   }
 
-  load_size = ALIGN_MEM(load_size, 0x1000);
-  debugPrintf("so_load: Total load size: %zu bytes (max: %zu)\n", load_size,
-              max_size);
-  if (load_size > max_size) {
-    res = -3;
+  if (exec_seg < 0) {
+    res = -1;
     goto err_free_so;
   }
 
-  load_base = base;
-  if (!load_base)
-    goto err_free_so;
+  load_size = ALIGN_MEM(max_end, 0x1000);
+  if (base == NULL) {
+    base = mmap(NULL, load_size, PROT_READ | PROT_WRITE | PROT_EXEC,
+                MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (base == MAP_FAILED) {
+      res = -4;
+      goto err_free_so;
+    }
+  }
 
+  load_base = base;
   memset(load_base, 0, load_size);
   load_virtbase = load_base;
 
-  debugPrintf("so_load: load base = %p\n", load_virtbase);
+  for (int i = 0; i < elf_hdr->e_phnum; i++) {
+    if (prog_hdr[i].p_type != PT_LOAD) continue;
+    memcpy((void *)((uintptr_t)load_base + prog_hdr[i].p_vaddr),
+           (void *)((uintptr_t)so_base + prog_hdr[i].p_offset),
+           prog_hdr[i].p_filesz);
+  }
 
-  // text
-  text_size = prog_hdr[text_segno].p_memsz;
-  text_virtbase =
-      (void *)(prog_hdr[text_segno].p_vaddr + (Elf64_Addr)load_virtbase);
-  text_base = (void *)(prog_hdr[text_segno].p_vaddr + (Elf64_Addr)load_base);
-  prog_hdr[text_segno].p_vaddr = (Elf64_Addr)text_virtbase;
-  memcpy(text_base,
-         (void *)((uintptr_t)so_base + prog_hdr[text_segno].p_offset),
-         prog_hdr[text_segno].p_filesz);
-
-  // data
-  data_size = prog_hdr[data_segno].p_memsz;
-  data_virtbase =
-      (void *)(prog_hdr[data_segno].p_vaddr + (Elf64_Addr)load_virtbase);
-  data_base = (void *)(prog_hdr[data_segno].p_vaddr + (Elf64_Addr)load_base);
-  prog_hdr[data_segno].p_vaddr = (Elf64_Addr)data_virtbase;
-  memcpy(data_base,
-         (void *)((uintptr_t)so_base + prog_hdr[data_segno].p_offset),
-         prog_hdr[data_segno].p_filesz);
-
-  syms = NULL;
-  dynstrtab = NULL;
+  text_size = prog_hdr[exec_seg].p_memsz;
+  text_base = (void *)((uintptr_t)load_base + prog_hdr[exec_seg].p_vaddr);
+  text_virtbase = text_base;
+  data_base = load_base;
+  data_size = load_size;
+  data_virtbase = load_base;
 
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
     if (strcmp(sh_name, ".dynsym") == 0) {
-      syms = (Elf64_Sym *)((uintptr_t)text_base + sec_hdr[i].sh_addr);
+      syms = (Elf64_Sym *)((uintptr_t)load_base + sec_hdr[i].sh_addr);
       num_syms = sec_hdr[i].sh_size / sizeof(Elf64_Sym);
     } else if (strcmp(sh_name, ".dynstr") == 0) {
-      dynstrtab = (char *)((uintptr_t)text_base + sec_hdr[i].sh_addr);
+      dynstrtab = (char *)((uintptr_t)load_base + sec_hdr[i].sh_addr);
     }
   }
 
-  if (syms == NULL || dynstrtab == NULL) {
-    res = -2;
-    goto err_free_load;
-  }
-
-  debugPrintf("so_load: %d dynamic symbols found\n", num_syms);
+  printf("[so_util] Successfully loaded %s at %p (size: %zu MB)\n",
+         filename, load_base, load_size / (1024 * 1024));
   return 0;
 
-err_free_load:
-  free(load_base);
 err_free_so:
   free(so_base);
+  so_base = NULL;
   return res;
 }
 
 int so_relocate(void) {
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
-    if (strcmp(sh_name, ".rela.dyn") == 0 ||
-        strcmp(sh_name, ".rela.plt") == 0) {
-      Elf64_Rela *rels =
-          (Elf64_Rela *)((uintptr_t)text_base + sec_hdr[i].sh_addr);
-      for (int j = 0; j < (int)(sec_hdr[i].sh_size / sizeof(Elf64_Rela)); j++) {
-        uintptr_t *ptr =
-            (uintptr_t *)((uintptr_t)text_base + rels[j].r_offset);
-        Elf64_Sym *sym = &syms[ELF64_R_SYM(rels[j].r_info)];
+    if (strcmp(sh_name, ".rela.dyn") == 0 || strcmp(sh_name, ".rela.plt") == 0) {
+      Elf64_Rela *relas = (Elf64_Rela *)((uintptr_t)load_base + sec_hdr[i].sh_addr);
+      int num_relas = sec_hdr[i].sh_size / sizeof(Elf64_Rela);
 
-        int type = ELF64_R_TYPE(rels[j].r_info);
-        switch (type) {
-        case R_AARCH64_ABS64:
-          *ptr = (uintptr_t)text_virtbase + sym->st_value + rels[j].r_addend;
-          break;
-        case R_AARCH64_RELATIVE:
-          *ptr = (uintptr_t)text_virtbase + rels[j].r_addend;
-          break;
-        case R_AARCH64_GLOB_DAT:
-        case R_AARCH64_JUMP_SLOT:
-          if (sym->st_shndx != SHN_UNDEF)
-            *ptr =
-                (uintptr_t)text_virtbase + sym->st_value + rels[j].r_addend;
-          break;
-        default:
-          fatal_error("Error: unknown relocation type: %x\n", type);
-          break;
+      for (int j = 0; j < num_relas; j++) {
+        Elf64_Rela *rela = &relas[j];
+        uint32_t type = ELF64_R_TYPE(rela->r_info);
+        uintptr_t *ptr = (uintptr_t *)((uintptr_t)load_base + rela->r_offset);
+
+        if (type == R_AARCH64_RELATIVE) {
+          *ptr = (uintptr_t)load_base + rela->r_addend;
         }
       }
     }
@@ -303,48 +198,48 @@ int so_relocate(void) {
   return 0;
 }
 
-int so_resolve(DynLibFunction *funcs, int num_funcs,
-               int taint_missing_imports) {
+int so_resolve(DynLibFunction *funcs, int num_funcs, int taint_missing_imports) {
+  int missing = 0;
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
-    if (strcmp(sh_name, ".rela.dyn") == 0 ||
-        strcmp(sh_name, ".rela.plt") == 0) {
-      Elf64_Rela *rels =
-          (Elf64_Rela *)((uintptr_t)text_base + sec_hdr[i].sh_addr);
-      for (int j = 0; j < (int)(sec_hdr[i].sh_size / sizeof(Elf64_Rela)); j++) {
-        uintptr_t *ptr =
-            (uintptr_t *)((uintptr_t)text_base + rels[j].r_offset);
-        Elf64_Sym *sym = &syms[ELF64_R_SYM(rels[j].r_info)];
+    if (strcmp(sh_name, ".rela.dyn") == 0 || strcmp(sh_name, ".rela.plt") == 0) {
+      Elf64_Rela *relas = (Elf64_Rela *)((uintptr_t)load_base + sec_hdr[i].sh_addr);
+      int num_relas = sec_hdr[i].sh_size / sizeof(Elf64_Rela);
 
-        int type = ELF64_R_TYPE(rels[j].r_info);
-        switch (type) {
-        case R_AARCH64_GLOB_DAT:
-        case R_AARCH64_JUMP_SLOT: {
-          if (sym->st_shndx == SHN_UNDEF) {
-            if (taint_missing_imports)
-              *ptr = rels[j].r_offset;
+      for (int j = 0; j < num_relas; j++) {
+        Elf64_Rela *rela = &relas[j];
+        uint32_t type = ELF64_R_TYPE(rela->r_info);
+        uint32_t sym_idx = ELF64_R_SYM(rela->r_info);
+        uintptr_t *ptr = (uintptr_t *)((uintptr_t)load_base + rela->r_offset);
 
-            char *name = dynstrtab + sym->st_name;
-            int found = 0;
+        if (type == R_AARCH64_GLOB_DAT || type == R_AARCH64_JUMP_SLOT || type == R_AARCH64_ABS64) {
+          if (sym_idx != 0) {
+            char *sym_name = dynstrtab + syms[sym_idx].st_name;
+            uintptr_t resolved = 0;
+
             for (int k = 0; k < num_funcs; k++) {
-              if (strcmp(name, funcs[k].symbol) == 0) {
-                *ptr = funcs[k].func;
-                found = 1;
+              if (strcmp(sym_name, funcs[k].symbol) == 0) {
+                resolved = funcs[k].func;
                 break;
               }
             }
-            if (!found)
-              fprintf(stderr, "*** UNRESOLVED import: \"%s\" (GOT offset 0x%lx) ***\n",
-                      name, (unsigned long)rels[j].r_offset);
+
+            if (!resolved) {
+              resolved = (uintptr_t)dlsym(RTLD_DEFAULT, sym_name);
+            }
+
+            if (resolved) {
+              *ptr = resolved + rela->r_addend;
+            } else {
+              missing++;
+              // printf("[so_util] Missing symbol: %s\n", sym_name);
+            }
           }
-          break;
-        }
-        default:
-          break;
         }
       }
     }
   }
+  printf("[so_util] Resolved symbols (%d unmapped)\n", missing);
   return 0;
 }
 
@@ -352,81 +247,44 @@ void so_execute_init_array(void) {
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
     if (strcmp(sh_name, ".init_array") == 0) {
-      int (**init_array)() =
-          (void *)((uintptr_t)text_virtbase + sec_hdr[i].sh_addr);
-      for (int j = 0; j < (int)(sec_hdr[i].sh_size / 8); j++) {
-        if (init_array[j] != 0)
-          init_array[j]();
+      uintptr_t *inits = (uintptr_t *)((uintptr_t)load_base + sec_hdr[i].sh_addr);
+      int count = sec_hdr[i].sh_size / sizeof(uintptr_t);
+      for (int j = 0; j < count; j++) {
+        if (inits[j] && inits[j] != (uintptr_t)-1) {
+          void (*fn)(void) = (void (*)(void))inits[j];
+          fn();
+        }
       }
     }
   }
 }
 
 uintptr_t so_find_addr(const char *symbol) {
+  if (!syms || !dynstrtab) return 0;
   for (int i = 0; i < num_syms; i++) {
-    char *name = dynstrtab + syms[i].st_name;
-    if (strcmp(name, symbol) == 0)
-      return (uintptr_t)text_base + syms[i].st_value;
-  }
-  fatal_error("Error: could not find symbol: %s\n", symbol);
-  return 0;
-}
-
-uintptr_t so_find_addr_safe(const char *symbol) {
-  for (int i = 0; i < num_syms; i++) {
-    char *name = dynstrtab + syms[i].st_name;
-    if (strcmp(name, symbol) == 0)
-      return (uintptr_t)text_base + syms[i].st_value;
-  }
-  return 0;
-}
-
-uintptr_t so_find_addr_rx(const char *symbol) {
-  for (int i = 0; i < num_syms; i++) {
-    char *name = dynstrtab + syms[i].st_name;
-    if (strcmp(name, symbol) == 0)
-      return (uintptr_t)text_virtbase + syms[i].st_value;
-  }
-  fatal_error("Error: could not find symbol: %s\n", symbol);
-  return 0;
-}
-
-uintptr_t so_find_rel_addr(const char *symbol) {
-  for (int i = 0; i < elf_hdr->e_shnum; i++) {
-    char *sh_name = shstrtab + sec_hdr[i].sh_name;
-    if (strcmp(sh_name, ".rela.dyn") == 0 ||
-        strcmp(sh_name, ".rela.plt") == 0) {
-      Elf64_Rela *rels =
-          (Elf64_Rela *)((uintptr_t)text_base + sec_hdr[i].sh_addr);
-      for (int j = 0; j < (int)(sec_hdr[i].sh_size / sizeof(Elf64_Rela)); j++) {
-        Elf64_Sym *sym = &syms[ELF64_R_SYM(rels[j].r_info)];
-        int type = ELF64_R_TYPE(rels[j].r_info);
-        if (type == R_AARCH64_GLOB_DAT || type == R_AARCH64_JUMP_SLOT) {
-          char *name = dynstrtab + sym->st_name;
-          if (strcmp(name, symbol) == 0)
-            return (uintptr_t)text_base + rels[j].r_offset;
-        }
+    if (syms[i].st_shndx != SHN_UNDEF) {
+      char *name = dynstrtab + syms[i].st_name;
+      if (strcmp(name, symbol) == 0) {
+        return (uintptr_t)load_base + syms[i].st_value;
       }
     }
   }
-  fatal_error("Error: could not find symbol: %s\n", symbol);
   return 0;
 }
 
 uintptr_t so_find_rel_addr_safe(const char *symbol) {
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
-    if (strcmp(sh_name, ".rela.dyn") == 0 ||
-        strcmp(sh_name, ".rela.plt") == 0) {
-      Elf64_Rela *rels =
-          (Elf64_Rela *)((uintptr_t)text_base + sec_hdr[i].sh_addr);
-      for (int j = 0; j < (int)(sec_hdr[i].sh_size / sizeof(Elf64_Rela)); j++) {
-        Elf64_Sym *sym = &syms[ELF64_R_SYM(rels[j].r_info)];
-        int type = ELF64_R_TYPE(rels[j].r_info);
-        if (type == R_AARCH64_GLOB_DAT || type == R_AARCH64_JUMP_SLOT) {
-          char *name = dynstrtab + sym->st_name;
-          if (strcmp(name, symbol) == 0)
-            return (uintptr_t)text_base + rels[j].r_offset;
+    if (strcmp(sh_name, ".rela.dyn") == 0 || strcmp(sh_name, ".rela.plt") == 0) {
+      Elf64_Rela *relas = (Elf64_Rela *)((uintptr_t)load_base + sec_hdr[i].sh_addr);
+      int num_relas = sec_hdr[i].sh_size / sizeof(Elf64_Rela);
+      for (int j = 0; j < num_relas; j++) {
+        uint32_t sym_idx = ELF64_R_SYM(relas[j].r_info);
+        if (sym_idx != 0) {
+          char *name = dynstrtab + syms[sym_idx].st_name;
+          if (strcmp(name, symbol) == 0) {
+            return (uintptr_t)load_base + relas[j].r_offset;
+          }
         }
       }
     }
@@ -434,20 +292,6 @@ uintptr_t so_find_rel_addr_safe(const char *symbol) {
   return 0;
 }
 
-DynLibFunction *so_find_import(DynLibFunction *funcs, int num_funcs,
-                               const char *name) {
-  for (int i = 0; i < num_funcs; ++i)
-    if (!strcmp(funcs[i].symbol, name))
-      return &funcs[i];
-  return NULL;
-}
-
-int so_unload(void) {
-  if (load_base == NULL)
-    return -1;
-  if (so_base)
-    so_free_temp();
-  if (munmap(load_base, load_size) != 0)
-    fatal_error("Error: could not unmap library memory");
-  return 0;
+void so_finalize(void) {
+  mprotect(text_virtbase, ALIGN_MEM(text_size, 0x1000), PROT_READ | PROT_EXEC);
 }

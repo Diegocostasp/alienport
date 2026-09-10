@@ -1,18 +1,9 @@
-/*
- * imports.h -- .so import resolution
- *
- * Based on max_arm64 by Jaakko Lukkari / fgsfds / Andy Nguyen
- * Adapted for Syberia ARM64 port
- */
-
-#ifndef __IMPORTS_H__
-#define __IMPORTS_H__
+#ifndef IMPORTS_H
+#define IMPORTS_H
 
 #include "so_util.h"
-#include <stdio.h>
 
-extern FILE *stderr_fake;
 extern DynLibFunction dynlib_functions[];
-extern size_t dynlib_numfunctions;
+extern int dynlib_num_functions;
 
 #endif

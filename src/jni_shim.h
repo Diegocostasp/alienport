@@ -1,16 +1,16 @@
-/*
- * jni_shim.h -- fake JNI environment for Syberia
- *
- * Provides a fake JavaVM and JNIEnv with stub vtables so that
- * JNI calls from libsyberia1.so don't crash.
- */
+#ifndef JNI_SHIM_H
+#define JNI_SHIM_H
 
-#ifndef __JNI_SHIM_H__
-#define __JNI_SHIM_H__
-
-void jni_shim_init(void **out_vm, void **out_env);
-
-// Set package name and OBB version (call before jni_shim_init)
-void jni_shim_set_package(const char *package_name, int obb_version);
-
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+void *jni_get_env(void);
+void *jni_get_vm(void);
+void jni_shim_init(const char *gamedir);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* JNI_SHIM_H */

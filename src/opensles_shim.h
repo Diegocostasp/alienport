@@ -1,11 +1,11 @@
-/*
- * opensles_shim.h -- OpenSL ES to SDL2 audio bridge
- */
-
-#ifndef __OPENSLES_SHIM_H__
-#define __OPENSLES_SHIM_H__
+#ifndef OPENSLES_SHIM_H
+#define OPENSLES_SHIM_H
 
 #include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 typedef uint32_t SLresult;
 typedef uint32_t SLuint32;
@@ -19,14 +19,17 @@ typedef uint32_t SLmillisecond;
 typedef uint32_t SLBoolean;
 
 #define SL_RESULT_SUCCESS ((SLresult)0x00000000)
+#define SL_RESULT_PREREQUISITE_NOT_MET ((SLresult)0x00000001)
+#define SL_RESULT_PARAMETER_INVALID ((SLresult)0x00000002)
+#define SL_RESULT_MEMORY_FAILURE ((SLresult)0x00000003)
 #define SL_RESULT_RESOURCE_ERROR ((SLresult)0x0000000D)
+
 #define SL_BOOLEAN_TRUE ((SLBoolean)0x00000001)
 #define SL_BOOLEAN_FALSE ((SLBoolean)0x00000000)
 
 #define SL_PLAYSTATE_STOPPED ((SLuint32)0x00000001)
 #define SL_PLAYSTATE_PAUSED ((SLuint32)0x00000002)
 #define SL_PLAYSTATE_PLAYING ((SLuint32)0x00000003)
-#define SL_TIME_UNKNOWN ((SLmillisecond)0xFFFFFFFF)
 
 #define SL_PLAYEVENT_HEADATEND ((SLuint32)0x00000001)
 #define SL_PLAYEVENT_HEADATMARKER ((SLuint32)0x00000002)
@@ -44,16 +47,19 @@ extern const SLInterfaceID sl_IID_ENGINE;
 extern const SLInterfaceID sl_IID_PLAY;
 extern const SLInterfaceID sl_IID_VOLUME;
 extern const SLInterfaceID sl_IID_BUFFERQUEUE;
-extern const SLInterfaceID sl_IID_EFFECTSEND;
-extern const SLInterfaceID sl_IID_ENGINECAPABILITIES;
-extern const SLInterfaceID sl_IID_ENVIRONMENTALREVERB;
+extern const SLInterfaceID sl_IID_SEEK;
 
-SLresult slCreateEngine_shim(void **pEngine, SLuint32 numOptions,
-                              const void *pEngineOptions,
-                              SLuint32 numInterfaces,
-                              const SLInterfaceID *pInterfaceIds,
-                              const SLBoolean *pInterfaceRequired);
+SLresult slCreateEngine(void **pEngine, SLuint32 numOptions,
+                        const void *pEngineOptions,
+                        SLuint32 numInterfaces,
+                        const SLInterfaceID *pInterfaceIds,
+                        const SLBoolean *pInterfaceRequired);
 
+void opensles_shim_init(void);
 void opensles_shim_pump_callbacks(void);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* OPENSLES_SHIM_H */
