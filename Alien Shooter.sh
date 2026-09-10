@@ -1,79 +1,70 @@
 #!/bin/bash
-CURR_TTY="/dev/tty1"
-SCRIPT_DIR="$(dirname "$(readlink -f "$0")")"
-GAME_DIR="$SCRIPT_DIR/alienport"
-BINARY="$GAME_DIR/alienport"
-LOG="$GAME_DIR/log.txt"
+# PortMaster / ArkOS / dArkOS / NextOS launcher for Alien Shooter v1.2.9
+# Target: R36S (RK3326 ARM64)
 
-# Garante que o log existe e limpa ele para nova sessão
-mkdir -p "$GAME_DIR"
-echo "=== Script iniciado: $(date) ===" > "$LOG"
-echo "GAME_DIR=$GAME_DIR" >> "$LOG"
-echo "BINARY=$BINARY" >> "$LOG"
+XDG_DATA_HOME=${XDG_DATA_HOME:-$HOME/.local/share}
 
 if [ -d "/opt/system/Tools/PortMaster/" ]; then
-  controlfolder="/opt/system/Tools/PortMaster"
+  CONTROL_FOLDER="/opt/system/Tools/PortMaster"
 elif [ -d "/opt/tools/PortMaster/" ]; then
-  controlfolder="/opt/tools/PortMaster"
+  CONTROL_FOLDER="/opt/tools/PortMaster"
+elif [ -d "$XDG_DATA_HOME/PortMaster/" ]; then
+  CONTROL_FOLDER="$XDG_DATA_HOME/PortMaster"
 else
-  controlfolder="/roms/ports/PortMaster"
+  CONTROL_FOLDER="/roms/ports/PortMaster"
 fi
 
-if [ -f "$controlfolder/control.txt" ]; then
-  source "$controlfolder/control.txt"
-  get_controls
+[ -f "${CONTROL_FOLDER}/control.txt" ] && source "${CONTROL_FOLDER}/control.txt"
+[ -f "${CONTROL_FOLDER}/mod_downloader.txt" ] && source "${CONTROL_FOLDER}/mod_downloader.txt"
+
+[ -n "$(type -t get_controls)" ] && get_controls
+
+GAMEDIR="/$directory/ports/alienport"
+[ ! -d "$GAMEDIR" ] && GAMEDIR="$(cd "$(dirname "$0")"/alienport && pwd)"
+[ ! -d "$GAMEDIR" ] && GAMEDIR="$(cd "$(dirname "$0")" && pwd)"
+
+cd "$GAMEDIR"
+
+# 1. Verificação / Instalação Híbrida de Dados (APK ou Pasta Pronta)
+if [ ! -f "lib/arm64-v8a/libalien_shooter.so" ] || [ ! -d "assets" ]; then
+    APK_FILE=$(ls -1 *.apk 2>/dev/null | head -n 1)
+    if [ -n "$APK_FILE" ] && [ -f "$APK_FILE" ]; then
+        echo "Extraindo dados do jogo a partir de $APK_FILE..."
+        if command -v unzip >/dev/null 2>&1; then
+            unzip -o -q "$APK_FILE" "assets/*" "lib/arm64-v8a/*" -d .
+        fi
+    fi
 fi
 
-exec < "$CURR_TTY"
-
-if [ ! -f "$BINARY" ]; then
-  echo "ERRO: binario nao encontrado em $BINARY" >> "$LOG"
-  printf "\033c" > "$CURR_TTY"
-  printf "Error: alienport binary not found at %s\n" "$BINARY" > "$CURR_TTY"
-  sleep 5
-  exit 1
+# Validação final dos dados necessários
+if [ ! -f "lib/arm64-v8a/libalien_shooter.so" ]; then
+    if [ -n "$ESUDO" ] && [ -n "$CUR_TTY" ]; then
+        $ESUDO $CUR_TTY ./tools/dialog --title "Erro Alien Shooter" \
+            --msgbox "Arquivos do jogo não encontrados!\nColoque a pasta 'assets' e 'lib' ou o arquivo .apk dentro de:\n$GAMEDIR" 0 0
+    else
+        echo "ERRO: lib/arm64-v8a/libalien_shooter.so não encontrado em $GAMEDIR"
+    fi
+    exit 1
 fi
 
-chmod +x "$BINARY"
-mkdir -p "$GAME_DIR/data"
+# Cria diretório de saves portátil se não existir
+mkdir -p "$GAMEDIR/savedata"
 
-export LD_LIBRARY_PATH="$GAME_DIR/lib/arm64-v8a:$GAME_DIR:$LD_LIBRARY_PATH"
-export SDL_VIDEODRIVER=kmsdrm
-export SDL_AUDIODRIVER=alsa
-export ALSOFT_DRIVERS=alsa
-export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
-export MALLOC_CHECK_=0
+# 2. Variáveis de ambiente
+export LD_LIBRARY_PATH="$GAMEDIR/lib:$LD_LIBRARY_PATH"
+[ -n "$sdl_controllerconfig" ] && export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 
-export MESA_GL_VERSION_OVERRIDE=2.1
-export MESA_GLES_VERSION_OVERRIDE=2.0
-export SDL_VIDEO_GL_DRIVER=libGLESv2.so
-export SDL_VIDEO_EGL_DRIVER=libEGL.so
-
-printf "\033c" > "$CURR_TTY"
-printf "\e[?25l" > "$CURR_TTY"
-echo 0 > /sys/class/vtconsole/vtcon0/bind 2>/dev/null || true
-echo 0 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true
-
-sync
-echo 3 | sudo tee /proc/sys/vm/drop_caches > /dev/null 2>&1 || true
-
-cd "$GAME_DIR"
-echo "=== Iniciando binario ===" >> "$LOG"
-
-# Carrega o shim de pthread apenas se existir
-if [ -f "$GAME_DIR/libpthread_preload.so" ]; then
-  echo "Carregando LD_PRELOAD=$GAME_DIR/libpthread_preload.so" >> "$LOG"
-  export LD_PRELOAD="$GAME_DIR/libpthread_preload.so"
-else
-  echo "libpthread_preload.so NAO encontrado, rodando sem preload" >> "$LOG"
+# 3. Execução
+if [ -n "$GPTOKEYB" ]; then
+    $GPTOKEYB "alienport" &
 fi
 
-"$BINARY" >> "$LOG" 2>&1
-EXIT_CODE=$?
-echo "=== Saiu com codigo: $EXIT_CODE ===" >> "$LOG"
+./alienport "$GAMEDIR"
 
-echo 1 > /sys/class/vtconsole/vtcon0/bind 2>/dev/null || true
-echo 1 > /sys/class/vtconsole/vtcon1/bind 2>/dev/null || true
-printf "\033c" > "$CURR_TTY"
-printf "\e[?25h" > "$CURR_TTY"
-exit $EXIT_CODE
+# 4. Finalização e limpeza
+if [ -n "$ESUDO" ]; then
+    $ESUDO killall -9 gptokeyb 2>/dev/null || true
+fi
+
+unset LD_LIBRARY_PATH
+printf "\033c" > /dev/tty0 2>/dev/null || true
