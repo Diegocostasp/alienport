@@ -17,6 +17,8 @@ EGLBoolean egl_shim_eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor);
 EGLBoolean egl_shim_eglChooseConfig(EGLDisplay dpy, const EGLint *attrib_list,
                                    EGLConfig *configs, EGLint config_size,
                                    EGLint *num_config);
+EGLBoolean egl_shim_eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config,
+                                       EGLint attribute, EGLint *value);
 EGLContext egl_shim_eglCreateContext(EGLDisplay dpy, EGLConfig config,
                                     EGLContext share_context,
                                     const EGLint *attrib_list);

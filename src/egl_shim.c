@@ -54,6 +54,23 @@ EGLBoolean egl_shim_eglChooseConfig(EGLDisplay dpy, const EGLint *attrib_list,
   return EGL_TRUE;
 }
 
+EGLBoolean egl_shim_eglGetConfigAttrib(EGLDisplay dpy, EGLConfig config,
+                                       EGLint attribute, EGLint *value) {
+  (void)dpy; (void)config;
+  if (!value) return EGL_FALSE;
+  if (attribute == EGL_CONFIG_ID) *value = 1;
+  else if (attribute == EGL_RED_SIZE) *value = 8;
+  else if (attribute == EGL_GREEN_SIZE) *value = 8;
+  else if (attribute == EGL_BLUE_SIZE) *value = 8;
+  else if (attribute == EGL_ALPHA_SIZE) *value = 8;
+  else if (attribute == EGL_DEPTH_SIZE) *value = 24;
+  else if (attribute == EGL_STENCIL_SIZE) *value = 8;
+  else if (attribute == EGL_RENDERABLE_TYPE) *value = EGL_OPENGL_ES2_BIT;
+  else if (attribute == EGL_SURFACE_TYPE) *value = EGL_WINDOW_BIT;
+  else *value = 0;
+  return EGL_TRUE;
+}
+
 EGLContext egl_shim_eglCreateContext(EGLDisplay dpy, EGLConfig config,
                                     EGLContext share_context,
                                     const EGLint *attrib_list) {

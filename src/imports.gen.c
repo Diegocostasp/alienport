@@ -158,7 +158,7 @@ DynLibFunction dynlib_functions[] = {
   {"eglCreateWindowSurface", (uintptr_t)egl_shim_eglCreateWindowSurface},
   {"eglDestroyContext", (uintptr_t)egl_shim_eglDestroyContext},
   {"eglDestroySurface", (uintptr_t)egl_shim_eglDestroySurface},
-  {"eglGetConfigAttrib", (uintptr_t)eglGetConfigAttrib},
+  {"eglGetConfigAttrib", (uintptr_t)egl_shim_eglGetConfigAttrib},
   {"eglGetDisplay", (uintptr_t)egl_shim_eglGetDisplay},
   {"eglGetError", (uintptr_t)egl_shim_eglGetError},
   {"eglGetProcAddress", (uintptr_t)egl_shim_eglGetProcAddress},
