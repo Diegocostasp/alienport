@@ -42,11 +42,16 @@
 #include <sys/ioctl.h>
 #include <poll.h>
 #include <sys/select.h>
+#include <sys/eventfd.h>
+#include <ifaddrs.h>
+#include <pwd.h>
+#include <net/if.h>
 #include <link.h>
 #include <GLES2/gl2.h>
 
 extern int __cxa_atexit(void (*)(void*), void*, void*);
 extern void __cxa_finalize(void*);
+extern int __register_atfork(void (*)(void), void (*)(void), void (*)(void), void *);
 
 DynLibFunction dynlib_functions[] = {
   {"AAssetManager_open", (uintptr_t)AAssetManager_open},
@@ -392,9 +397,9 @@ DynLibFunction dynlib_functions[] = {
   {"srand", (uintptr_t)srand},
   {"sscanf", (uintptr_t)sscanf},
   {"stat", (uintptr_t)stat},
-  {"stderr", (uintptr_t)stderr},
-  {"stdin", (uintptr_t)stdin},
-  {"stdout", (uintptr_t)stdout},
+  {"stderr", (uintptr_t)&__sF[BIONIC_FILE_SZ * 2]},
+  {"stdin", (uintptr_t)&__sF[0]},
+  {"stdout", (uintptr_t)&__sF[BIONIC_FILE_SZ]},
   {"strcat", (uintptr_t)strcat},
   {"strchr", (uintptr_t)strchr},
   {"strcmp", (uintptr_t)strcmp},

@@ -11,7 +11,7 @@ extern "C" {
 #endif
 
 /* Canário Bionic TLS pad: reserva slot estável em tpidr_el0+0x28 */
-extern __attribute__((used, aligned(16))) _Thread_local char g_bionic_guard_pad[256];
+extern __attribute__((aligned(16))) _Thread_local char g_bionic_guard_pad[256];
 
 #define BIONIC_FILE_SZ 152
 extern unsigned char __sF[BIONIC_FILE_SZ * 3];
