@@ -20,14 +20,14 @@ jobs:
       run: |
         docker run --rm -v "${{ github.workspace }}:/work" -w /work debian:bullseye bash -c '
           set -e
-          sed -i "/security/d" /etc/apt/sources.list || true
           echo "Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99no-check-valid-until
+          echo "Acquire::Check-Date \"false\";" >> /etc/apt/apt.conf.d/99no-check-valid-until
           dpkg --add-architecture arm64
-          apt-get update -o Acquire::Check-Valid-Until=false
+          apt-get update -o Acquire::Check-Valid-Until=false --allow-releaseinfo-change
           apt-get install -y --no-install-recommends \
-            build-essential \
             gcc-aarch64-linux-gnu \
             g++-aarch64-linux-gnu \
+            make \
             pkg-config \
             cmake \
             libsdl2-dev:arm64 \
