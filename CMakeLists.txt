@@ -34,19 +34,24 @@ set(SOURCES
 
 add_executable(${TARGET_NAME} ${SOURCES})
 target_compile_definitions(${TARGET_NAME} PRIVATE ${PLATFORM_DEFINES} _GNU_SOURCE)
-target_include_directories(${TARGET_NAME} PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_include_directories(${TARGET_NAME} PRIVATE 
+    ${CMAKE_SOURCE_DIR}/src
+    /usr/include/aarch64-linux-gnu/SDL2
+    /usr/include/aarch64-linux-gnu
+)
 
 # Dependencies
 find_package(PkgConfig REQUIRED)
 
-pkg_check_modules(SDL2 REQUIRED IMPORTED_TARGET sdl2)
-pkg_check_modules(EGL REQUIRED IMPORTED_TARGET egl)
-pkg_check_modules(GLESV2 REQUIRED IMPORTED_TARGET glesv2)
+pkg_check_modules(SDL2 REQUIRED sdl2)
+
+target_include_directories(${TARGET_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
+target_compile_options(${TARGET_NAME} PRIVATE ${SDL2_CFLAGS_OTHER})
+target_link_directories(${TARGET_NAME} PRIVATE ${SDL2_LIBRARY_DIRS})
 
 target_link_libraries(${TARGET_NAME} PRIVATE
-    PkgConfig::SDL2
-    PkgConfig::EGL
-    PkgConfig::GLESV2
+    ${SDL2_LIBRARIES}
+    GLESv2
     m
     dl
     z
