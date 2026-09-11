@@ -14,6 +14,7 @@ typedef uint16_t SLuint16;
 typedef int16_t SLint16;
 typedef uint8_t SLuint8;
 typedef int8_t SLint8;
+typedef char SLchar;
 typedef int32_t SLmillibel;
 typedef uint32_t SLmillisecond;
 typedef uint32_t SLBoolean;

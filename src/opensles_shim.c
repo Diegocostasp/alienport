@@ -430,19 +430,19 @@ static SLresult obj_GetInterface(void *self, const SLInterfaceID iid, void *pInt
   PlayerState *ps = get_player_from_obj_itf(self);
 
   if (iid == sl_IID_PLAY || *(const int *)iid == id_play_tag) {
-    *(const SLPlayItf_ **)pInterface = &g_play_itf_impl;
+    *(void **)pInterface = (void *)&ps->play_itf;
     return SL_RESULT_SUCCESS;
   }
   if (iid == sl_IID_BUFFERQUEUE || *(const int *)iid == id_bufferqueue_tag) {
-    *(const SLBufferQueueItf_ **)pInterface = &g_bq_itf_impl;
+    *(void **)pInterface = (void *)&ps->bq_itf;
     return SL_RESULT_SUCCESS;
   }
   if (iid == sl_IID_VOLUME || *(const int *)iid == id_volume_tag) {
-    *(const SLVolumeItf_ **)pInterface = &g_vol_itf_impl;
+    *(void **)pInterface = (void *)&ps->volume_itf;
     return SL_RESULT_SUCCESS;
   }
   if (iid == sl_IID_SEEK || *(const int *)iid == id_seek_tag) {
-    *(const SLSeekItf_ **)pInterface = &g_seek_itf_impl;
+    *(void **)pInterface = (void *)&ps->seek_itf;
     return SL_RESULT_SUCCESS;
   }
 
@@ -544,11 +544,8 @@ static SLresult engine_CreateOutputMix(void *self, void **pMix, SLuint32 numInte
 }
 
 static const SLEngineItf_ g_engine_itf = {
-  NULL, NULL,
-  engine_CreateAudioPlayer,
-  NULL, NULL, NULL, NULL,
-  engine_CreateOutputMix,
-  NULL, NULL, NULL, NULL, NULL, NULL, NULL
+  .CreateAudioPlayer = engine_CreateAudioPlayer,
+  .CreateOutputMix = engine_CreateOutputMix
 };
 static const SLEngineItf_ *g_engine_itf_ptr = &g_engine_itf;
 
