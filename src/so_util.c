@@ -44,7 +44,7 @@ void hook_arm64(uintptr_t addr, uintptr_t dst) {
   uint32_t *hook = (uint32_t *)addr;
   hook[0] = 0x58000051u; // LDR X17, #0x8
   hook[1] = 0xd61f0220u; // BR X17
-  *(uint64_t *)(hook + 2) = dst;
+  memcpy(hook + 2, &dst, sizeof(dst)); // safe against unaligned address
   __builtin___clear_cache((char *)hook, (char *)hook + 16);
 }
 
@@ -178,6 +178,7 @@ err_free_so:
 }
 
 int so_relocate(void) {
+  int count_reloc = 0;
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
     if (strcmp(sh_name, ".rela.dyn") == 0 || strcmp(sh_name, ".rela.plt") == 0) {
@@ -187,18 +188,40 @@ int so_relocate(void) {
       for (int j = 0; j < num_relas; j++) {
         Elf64_Rela *rela = &relas[j];
         uint32_t type = ELF64_R_TYPE(rela->r_info);
+        uint32_t sym_idx = ELF64_R_SYM(rela->r_info);
         uintptr_t *ptr = (uintptr_t *)((uintptr_t)load_base + rela->r_offset);
+        Elf64_Sym *sym = (sym_idx < (uint32_t)num_syms) ? &syms[sym_idx] : NULL;
 
-        if (type == R_AARCH64_RELATIVE) {
+        switch (type) {
+        case R_AARCH64_RELATIVE:
           *ptr = (uintptr_t)load_base + rela->r_addend;
+          count_reloc++;
+          break;
+        case R_AARCH64_ABS64:
+          if (sym && sym->st_shndx != SHN_UNDEF) {
+            *ptr = (uintptr_t)load_base + sym->st_value + rela->r_addend;
+            count_reloc++;
+          }
+          break;
+        case R_AARCH64_GLOB_DAT:
+        case R_AARCH64_JUMP_SLOT:
+          if (sym && sym->st_shndx != SHN_UNDEF) {
+            *ptr = (uintptr_t)load_base + sym->st_value + rela->r_addend;
+            count_reloc++;
+          }
+          break;
+        default:
+          break;
         }
       }
     }
   }
+  printf("[so_util] Relocated %d internal references\n", count_reloc);
   return 0;
 }
 
 int so_resolve(DynLibFunction *funcs, int num_funcs, int taint_missing_imports) {
+  int resolved_count = 0;
   int missing = 0;
   for (int i = 0; i < elf_hdr->e_shnum; i++) {
     char *sh_name = shstrtab + sec_hdr[i].sh_name;
@@ -213,33 +236,38 @@ int so_resolve(DynLibFunction *funcs, int num_funcs, int taint_missing_imports) 
         uintptr_t *ptr = (uintptr_t *)((uintptr_t)load_base + rela->r_offset);
 
         if (type == R_AARCH64_GLOB_DAT || type == R_AARCH64_JUMP_SLOT || type == R_AARCH64_ABS64) {
-          if (sym_idx != 0) {
-            char *sym_name = dynstrtab + syms[sym_idx].st_name;
-            uintptr_t resolved = 0;
+          if (sym_idx != 0 && sym_idx < (uint32_t)num_syms) {
+            Elf64_Sym *sym = &syms[sym_idx];
+            // Only resolve imported symbols (undefined in this .so)
+            if (sym->st_shndx == SHN_UNDEF) {
+              char *sym_name = dynstrtab + sym->st_name;
+              uintptr_t resolved = 0;
 
-            for (int k = 0; k < num_funcs; k++) {
-              if (strcmp(sym_name, funcs[k].symbol) == 0) {
-                resolved = funcs[k].func;
-                break;
+              for (int k = 0; k < num_funcs; k++) {
+                if (strcmp(sym_name, funcs[k].symbol) == 0) {
+                  resolved = funcs[k].func;
+                  break;
+                }
               }
-            }
 
-            if (!resolved) {
-              resolved = (uintptr_t)dlsym(RTLD_DEFAULT, sym_name);
-            }
+              if (!resolved) {
+                resolved = (uintptr_t)dlsym(RTLD_DEFAULT, sym_name);
+              }
 
-            if (resolved) {
-              *ptr = resolved + rela->r_addend;
-            } else {
-              missing++;
-              // printf("[so_util] Missing symbol: %s\n", sym_name);
+              if (resolved) {
+                *ptr = resolved + rela->r_addend;
+                resolved_count++;
+              } else {
+                missing++;
+                // fprintf(stderr, "[so_util] Missing symbol: %s\n", sym_name);
+              }
             }
           }
         }
       }
     }
   }
-  printf("[so_util] Resolved symbols (%d unmapped)\n", missing);
+  printf("[so_util] Resolved %d external imports (%d unmapped)\n", resolved_count, missing);
   return 0;
 }
 

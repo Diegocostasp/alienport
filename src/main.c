@@ -17,6 +17,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <ucontext.h>
 #include <unistd.h>
 
 #include "android_shim.h"
@@ -27,8 +28,6 @@
 #include "jni_shim.h"
 #include "opensles_shim.h"
 #include "so_util.h"
-
-#define SO_NAME "lib/arm64-v8a/libalien_shooter.so"
 
 /* DRM / License bypass hooks */
 static int hook_is_legal(void) {
@@ -43,12 +42,59 @@ static int hook_ad_init(void) {
   return 0;
 }
 
+static void crash_handler(int sig, siginfo_t *info, void *uctx) {
+  ucontext_t *uc = (ucontext_t *)uctx;
+  uintptr_t pc = uc ? uc->uc_mcontext.pc : 0;
+  uintptr_t fault_addr = info ? (uintptr_t)info->si_addr : 0;
+  fprintf(stderr, "\n==================== CRASH INTERCEPTADO ====================\n");
+  fprintf(stderr, "Sinal: %d (%s)\n", sig,
+          sig == SIGSEGV ? "SIGSEGV" : sig == SIGBUS ? "SIGBUS" : sig == SIGABRT ? "SIGABRT" : "OUTRO");
+  fprintf(stderr, "Endereço da Falha: %p\n", (void *)fault_addr);
+  fprintf(stderr, "Contador de Programa (PC): %p\n", (void *)pc);
+  if (text_base && pc >= (uintptr_t)text_base && pc < (uintptr_t)text_base + text_size) {
+    fprintf(stderr, "PC dentro de libalien_shooter.so (offset: +0x%lx)\n", (unsigned long)(pc - (uintptr_t)text_base));
+  }
+  if (uc) {
+    fprintf(stderr, "Registradores:\n");
+    for (int i = 0; i < 31; i++) {
+      fprintf(stderr, "  x%-2d = 0x%016lx%s", i, (unsigned long)uc->uc_mcontext.regs[i],
+              (i % 3 == 2 || i == 30) ? "\n" : "");
+    }
+    fprintf(stderr, "  sp  = 0x%016lx\n", (unsigned long)uc->uc_mcontext.sp);
+  }
+  fprintf(stderr, "============================================================\n");
+  fflush(stderr);
+  _exit(128 + sig);
+}
+
+static void install_crash_handler(void) {
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_sigaction = crash_handler;
+  sa.sa_flags = SA_SIGINFO;
+  sigaction(SIGSEGV, &sa, NULL);
+  sigaction(SIGBUS, &sa, NULL);
+  sigaction(SIGABRT, &sa, NULL);
+  sigaction(SIGFPE, &sa, NULL);
+  sigaction(SIGILL, &sa, NULL);
+}
+
 int main(int argc, char *argv[]) {
+  // Desativa bufferização de stdout/stderr para garantir saída no log.txt em caso de crash
+  setvbuf(stdout, NULL, _IONBF, 0);
+  setvbuf(stderr, NULL, _IONBF, 0);
+
+  // Instala capturador de falhas de memória
+  install_crash_handler();
+
+  // Garante inicialização do stack guard pad de TLS
+  g_bionic_guard_pad[0x28] = 0x42;
+
   char gamedir[PATH_MAX];
   if (argc > 1 && argv[1]) {
     strncpy(gamedir, argv[1], sizeof(gamedir) - 1);
   } else {
-    // Current working directory
+    // Diretório atual de trabalho
     if (!getcwd(gamedir, sizeof(gamedir))) {
       strcpy(gamedir, ".");
     }
@@ -61,31 +107,53 @@ int main(int argc, char *argv[]) {
   printf("==================================================\n");
 
   /* Inicializa shims básicos */
+  printf("[main] Inicializando shims de Asset e JNI...\n");
   asset_shim_init(gamedir);
   jni_shim_init(gamedir);
 
-  /* Verifica se a biblioteca existe */
-  char so_path[PATH_MAX];
-  snprintf(so_path, sizeof(so_path), "%s/%s", gamedir, SO_NAME);
-  if (access(so_path, F_OK) != 0) {
-    // Tenta relativo direto
-    snprintf(so_path, sizeof(so_path), "%s", SO_NAME);
-    if (access(so_path, F_OK) != 0) {
-      fprintf(stderr, "ERRO: %s não encontrado em %s!\n", SO_NAME, gamedir);
-      return 1;
+  /* Busca o binário da engine em caminhos possíveis */
+  const char *candidate_paths[] = {
+    "lib/arm64-v8a/libalien_shooter.so",
+    "lib/libalien_shooter.so",
+    "libalien_shooter.so"
+  };
+  char so_path[PATH_MAX] = {0};
+  int found_so = 0;
+
+  for (size_t i = 0; i < sizeof(candidate_paths) / sizeof(candidate_paths[0]); i++) {
+    char test_path[PATH_MAX];
+    snprintf(test_path, sizeof(test_path), "%s/%s", gamedir, candidate_paths[i]);
+    if (access(test_path, F_OK) == 0) {
+      strncpy(so_path, test_path, sizeof(so_path) - 1);
+      found_so = 1;
+      break;
+    }
+    if (access(candidate_paths[i], F_OK) == 0) {
+      strncpy(so_path, candidate_paths[i], sizeof(so_path) - 1);
+      found_so = 1;
+      break;
     }
   }
 
+  if (!found_so) {
+    fprintf(stderr, "ERRO CRÍTICO: libalien_shooter.so não encontrado em %s!\n", gamedir);
+    return 1;
+  }
+  printf("[main] Biblioteca do jogo encontrada em: %s\n", so_path);
+
   /* 1. Carrega o ELF da engine */
+  printf("[main] Carregando ELF na memória virtual...\n");
   if (so_load(so_path, NULL, 0) != 0) {
     fprintf(stderr, "ERRO: Falha ao carregar %s!\n", so_path);
     return 1;
   }
 
-  /* 2. Aplica relocações internas (R_AARCH64_RELATIVE) */
+  /* 2. Aplica relocações internas e relativas */
+  printf("[main] Aplicando relocações ELF...\n");
   so_relocate();
 
   /* 3. Resolve importações com as funções da tabela */
+  printf("[main] Resolvendo símbolos de importação com a libc/shims...\n");
   so_resolve(dynlib_functions, dynlib_num_functions, 1);
 
   /* 4. Trava de Licença e Certificado: Força retorno 1 (Legal / Full Game) */
@@ -124,9 +192,11 @@ int main(int argc, char *argv[]) {
   /* 5. Executa construtores (.init_array) */
   printf("[main] Executando construtores (.init_array)...\n");
   so_execute_init_array();
+  printf("[main] Construtores (.init_array) finalizados com sucesso!\n");
 
   /* 6. Restaura permissões do segmento executável */
   so_finalize();
+  so_flush_caches();
 
   /* 7. Localiza o ponto de entrada da ANativeActivity */
   uintptr_t on_create_addr = so_find_addr("ANativeActivity_onCreate");
@@ -137,6 +207,7 @@ int main(int argc, char *argv[]) {
   printf("[main] ANativeActivity_onCreate encontrado em %p\n", (void *)on_create_addr);
 
   /* 8. Inicializa ambiente fake Android e janela SDL2 */
+  printf("[main] Inicializando janela SDL2 e subsistema gráfico EGL/GLES2...\n");
   struct android_app *app = android_shim_init();
   if (!app) {
     fprintf(stderr, "ERRO: Falha ao inicializar o android_shim!\n");
