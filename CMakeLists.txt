@@ -15,7 +15,7 @@ elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86_64|AMD64)$")
     set(PLATFORM_DEFINES "-D__LINUX__")
 endif()
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -ffunction-sections -fdata-sections -Wall -Wno-unused-function ${ARCH_FLAGS}")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -ffunction-sections -fdata-sections -Wall -Wno-unused-function -Wno-format-truncation ${ARCH_FLAGS}")
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -Wl,--gc-sections ${ARCH_FLAGS}")
 
 # Sources
