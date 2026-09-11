@@ -51,6 +51,7 @@ target_link_directories(${TARGET_NAME} PRIVATE ${SDL2_LIBRARY_DIRS})
 
 target_link_libraries(${TARGET_NAME} PRIVATE
     ${SDL2_LIBRARIES}
+    EGL
     GLESv2
     m
     dl
