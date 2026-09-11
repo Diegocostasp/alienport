@@ -20,8 +20,10 @@ jobs:
       run: |
         docker run --rm -v "${{ github.workspace }}:/work" -w /work debian:bullseye bash -c '
           set -e
+          sed -i "/security/d" /etc/apt/sources.list || true
+          echo "Acquire::Check-Valid-Until \"false\";" > /etc/apt/apt.conf.d/99no-check-valid-until
           dpkg --add-architecture arm64
-          apt-get update
+          apt-get update -o Acquire::Check-Valid-Until=false
           apt-get install -y --no-install-recommends \
             build-essential \
             gcc-aarch64-linux-gnu \
