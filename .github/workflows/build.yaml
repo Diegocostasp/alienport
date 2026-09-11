@@ -16,20 +16,33 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Install cross-toolchain and dependencies
+    - name: Build with Docker (Debian Bullseye for R36S GLIBC 2.31 compatibility)
       run: |
-        sudo apt-get update
-        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu cmake ninja-build libsdl2-dev
+        docker run --rm -v "${{ github.workspace }}:/work" -w /work debian:bullseye bash -c '
+          set -e
+          dpkg --add-architecture arm64
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            pkg-config \
+            cmake \
+            libsdl2-dev:arm64 \
+            libgles2-mesa-dev:arm64 \
+            libegl1-mesa-dev:arm64
 
-    - name: Build with AArch64 cross-compiler
-      run: |
-        mkdir -p build && cd build
-        cmake .. \
-          -DCMAKE_SYSTEM_NAME=Linux \
-          -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
-          -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
-          -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++
-        cmake --build . --config Release
+          mkdir -p build && cd build
+          cmake .. \
+            -DCMAKE_SYSTEM_NAME=Linux \
+            -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
+            -DCMAKE_C_COMPILER=aarch64-linux-gnu-gcc \
+            -DCMAKE_CXX_COMPILER=aarch64-linux-gnu-g++ \
+            -DPKG_CONFIG_EXECUTABLE=/usr/bin/aarch64-linux-gnu-pkg-config
+          cmake --build . --config Release -j$(nproc)
+          aarch64-linux-gnu-strip alienport
+          chmod -R 777 /work/build
+        '
 
     - name: Prepare PortMaster Package
       run: |
@@ -39,6 +52,7 @@ jobs:
         cp "Alien Shooter.sh" package/
         cp port.json package/alienport/ 2>/dev/null || true
         cp gameinfo.xml package/alienport/ 2>/dev/null || true
+        chmod +x package/"Alien Shooter.sh" package/alienport/alienport
 
     - name: Upload Binary Artifact
       uses: actions/upload-artifact@v4
