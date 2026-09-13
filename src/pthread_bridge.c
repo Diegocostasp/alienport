@@ -44,8 +44,33 @@ int b_mutexattr_settype(void *a, int type) {
   return 0;
 }
 
-/* Distingue ponteiro de heap (> 0x10000) de inicializadores estáticos Bionic (0, 0x4000, 0x8000) */
-#define IS_HEAP_PTR(v) ((uintptr_t)(v) > 0x10000u)
+/* Rastreamento estrito de objetos alocados pela bridge para evitar free() em inteiros Bionic */
+#define MAX_TRACKED_OBJS 8192
+static void *g_tracked_objs[MAX_TRACKED_OBJS];
+static int g_num_tracked = 0;
+
+static void track_obj(void *ptr) {
+  if (g_num_tracked < MAX_TRACKED_OBJS) {
+    g_tracked_objs[g_num_tracked++] = ptr;
+  }
+}
+
+static int is_tracked_obj(void *ptr) {
+  if (!ptr || (uintptr_t)ptr < 0x10000) return 0;
+  for (int i = 0; i < g_num_tracked; i++) {
+    if (g_tracked_objs[i] == ptr) return 1;
+  }
+  return 0;
+}
+
+static void untrack_obj(void *ptr) {
+  for (int i = 0; i < g_num_tracked; i++) {
+    if (g_tracked_objs[i] == ptr) {
+      g_tracked_objs[i] = g_tracked_objs[--g_num_tracked];
+      return;
+    }
+  }
+}
 
 static pthread_mutex_t *new_recursive_mutex(void) {
   pthread_mutex_t *r = (pthread_mutex_t *)calloc(1, sizeof(pthread_mutex_t));
@@ -54,16 +79,17 @@ static pthread_mutex_t *new_recursive_mutex(void) {
   pthread_mutexattr_settype(&a, PTHREAD_MUTEX_RECURSIVE);
   pthread_mutex_init(r, &a);
   pthread_mutexattr_destroy(&a);
+  track_obj(r);
   return r;
 }
 
 static pthread_mutex_t *mtx_real(void *m) {
   if (!m) return NULL;
   pthread_mutex_t **slot = (pthread_mutex_t **)m;
-  if (IS_HEAP_PTR(*slot))
+  if (is_tracked_obj(*slot))
     return *slot;
   pthread_mutex_lock(&g_lock);
-  if (!IS_HEAP_PTR(*slot))
+  if (!is_tracked_obj(*slot))
     *slot = new_recursive_mutex();
   pthread_mutex_unlock(&g_lock);
   return *slot;
@@ -73,9 +99,14 @@ int b_mutex_init(void *m, const void *attr) {
   (void)attr;
   if (!m) return 0;
   pthread_mutex_t **slot = (pthread_mutex_t **)m;
-  pthread_mutex_t *r = new_recursive_mutex();
   pthread_mutex_lock(&g_lock);
-  *slot = r;
+  if (is_tracked_obj(*slot)) {
+    pthread_mutex_destroy(*slot);
+    void *to_free = *slot;
+    untrack_obj(to_free);
+    free(to_free);
+  }
+  *slot = new_recursive_mutex();
   pthread_mutex_unlock(&g_lock);
   return 0;
 }
@@ -99,9 +130,13 @@ int b_mutex_destroy(void *m) {
   if (!m) return 0;
   pthread_mutex_t **slot = (pthread_mutex_t **)m;
   pthread_mutex_lock(&g_lock);
-  if (IS_HEAP_PTR(*slot)) {
+  if (is_tracked_obj(*slot)) {
     pthread_mutex_destroy(*slot);
-    free(*slot);
+    void *to_free = *slot;
+    untrack_obj(to_free);
+    *slot = NULL;
+    free(to_free);
+  } else {
     *slot = NULL;
   }
   pthread_mutex_unlock(&g_lock);
@@ -132,16 +167,17 @@ static pthread_cond_t *new_monotonic_cond(void) {
   pthread_condattr_setclock(&a, CLOCK_MONOTONIC);
   pthread_cond_init(r, &a);
   pthread_condattr_destroy(&a);
+  track_obj(r);
   return r;
 }
 
 static pthread_cond_t *cond_real(void *c) {
   if (!c) return NULL;
   pthread_cond_t **slot = (pthread_cond_t **)c;
-  if (IS_HEAP_PTR(*slot))
+  if (is_tracked_obj(*slot))
     return *slot;
   pthread_mutex_lock(&g_lock);
-  if (!IS_HEAP_PTR(*slot))
+  if (!is_tracked_obj(*slot))
     *slot = new_monotonic_cond();
   pthread_mutex_unlock(&g_lock);
   return *slot;
@@ -151,9 +187,14 @@ int b_cond_init(void *c, const void *attr) {
   (void)attr;
   if (!c) return 0;
   pthread_cond_t **slot = (pthread_cond_t **)c;
-  pthread_cond_t *r = new_monotonic_cond();
   pthread_mutex_lock(&g_lock);
-  *slot = r;
+  if (is_tracked_obj(*slot)) {
+    pthread_cond_destroy(*slot);
+    void *to_free = *slot;
+    untrack_obj(to_free);
+    free(to_free);
+  }
+  *slot = new_monotonic_cond();
   pthread_mutex_unlock(&g_lock);
   return 0;
 }
@@ -162,9 +203,13 @@ int b_cond_destroy(void *c) {
   if (!c) return 0;
   pthread_cond_t **slot = (pthread_cond_t **)c;
   pthread_mutex_lock(&g_lock);
-  if (IS_HEAP_PTR(*slot)) {
+  if (is_tracked_obj(*slot)) {
     pthread_cond_destroy(*slot);
-    free(*slot);
+    void *to_free = *slot;
+    untrack_obj(to_free);
+    *slot = NULL;
+    free(to_free);
+  } else {
     *slot = NULL;
   }
   pthread_mutex_unlock(&g_lock);
@@ -182,15 +227,15 @@ int b_cond_broadcast(void *c) {
 }
 
 int b_cond_wait(void *c, void *m) {
-  pthread_cond_t *rc = cond_real(c);
-  pthread_mutex_t *rm = mtx_real(m);
-  return (rc && rm) ? pthread_cond_wait(rc, rm) : 0;
+  pthread_cond_t *cr = cond_real(c);
+  pthread_mutex_t *mr = mtx_real(m);
+  return (cr && mr) ? pthread_cond_wait(cr, mr) : 0;
 }
 
 int b_cond_timedwait(void *c, void *m, const struct timespec *ts) {
-  pthread_cond_t *rc = cond_real(c);
-  pthread_mutex_t *rm = mtx_real(m);
-  return (rc && rm) ? pthread_cond_timedwait(rc, rm, ts) : 0;
+  pthread_cond_t *cr = cond_real(c);
+  pthread_mutex_t *mr = mtx_real(m);
+  return (cr && mr) ? pthread_cond_timedwait(cr, mr, ts) : 0;
 }
 
 /* ---------------- Read-Write Locks ---------------- */
@@ -198,12 +243,14 @@ int b_cond_timedwait(void *c, void *m, const struct timespec *ts) {
 static pthread_rwlock_t *rw_real(void *rw) {
   if (!rw) return NULL;
   pthread_rwlock_t **slot = (pthread_rwlock_t **)rw;
-  if (IS_HEAP_PTR(*slot))
+  if (is_tracked_obj(*slot))
     return *slot;
   pthread_mutex_lock(&g_lock);
-  if (!IS_HEAP_PTR(*slot)) {
-    *slot = (pthread_rwlock_t *)calloc(1, sizeof(pthread_rwlock_t));
-    pthread_rwlock_init(*slot, NULL);
+  if (!is_tracked_obj(*slot)) {
+    pthread_rwlock_t *rr = (pthread_rwlock_t *)calloc(1, sizeof(pthread_rwlock_t));
+    pthread_rwlock_init(rr, NULL);
+    track_obj(rr);
+    *slot = rr;
   }
   pthread_mutex_unlock(&g_lock);
   return *slot;
@@ -216,6 +263,13 @@ int b_rwlock_init(void *rw, const void *attr) {
   pthread_rwlock_t *r = (pthread_rwlock_t *)calloc(1, sizeof(pthread_rwlock_t));
   pthread_rwlock_init(r, NULL);
   pthread_mutex_lock(&g_lock);
+  if (is_tracked_obj(*slot)) {
+    pthread_rwlock_destroy(*slot);
+    void *to_free = *slot;
+    untrack_obj(to_free);
+    free(to_free);
+  }
+  track_obj(r);
   *slot = r;
   pthread_mutex_unlock(&g_lock);
   return 0;
@@ -225,9 +279,13 @@ int b_rwlock_destroy(void *rw) {
   if (!rw) return 0;
   pthread_rwlock_t **slot = (pthread_rwlock_t **)rw;
   pthread_mutex_lock(&g_lock);
-  if (IS_HEAP_PTR(*slot)) {
+  if (is_tracked_obj(*slot)) {
     pthread_rwlock_destroy(*slot);
-    free(*slot);
+    void *to_free = *slot;
+    untrack_obj(to_free);
+    *slot = NULL;
+    free(to_free);
+  } else {
     *slot = NULL;
   }
   pthread_mutex_unlock(&g_lock);

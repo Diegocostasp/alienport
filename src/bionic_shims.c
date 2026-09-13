@@ -71,16 +71,65 @@ void bionic_set_abort_message(const char *msg) {
   if (msg) fprintf(stderr, "[bionic-abort] %s\n", msg);
 }
 
+void *bionic_malloc(size_t size) {
+  return malloc(size);
+}
+
+void *bionic_calloc(size_t n, size_t size) {
+  return calloc(n, size);
+}
+
+void *bionic_realloc(void *ptr, size_t size) {
+  if (!ptr) return malloc(size);
+  if ((uintptr_t)ptr < 0x10000 || ((uintptr_t)ptr & 0xF) != 0) {
+    return malloc(size);
+  }
+  if (load_base && (uintptr_t)ptr >= (uintptr_t)load_base &&
+      (uintptr_t)ptr < (uintptr_t)load_base + load_size) {
+    void *new_ptr = malloc(size);
+    return new_ptr;
+  }
+  return realloc(ptr, size);
+}
+
+#include <sys/mman.h>
+#include <pthread.h>
+
 void bionic_free(void *ptr) {
   if (!ptr) return;
-  // Ignore frees of addresses within the static loaded .so memory (text/data/bss)
-  if (load_base && (uintptr_t)ptr >= (uintptr_t)load_base && (uintptr_t)ptr < (uintptr_t)load_base + load_size) {
+
+  // 1. Ignore low sentinel / unmapped / NULL-page addresses
+  if ((uintptr_t)ptr < 0x10000) return;
+
+  // 2. Ignore pointers inside the loaded .so memory (text/rodata/data/bss)
+  if (load_base && (uintptr_t)ptr >= (uintptr_t)load_base &&
+      (uintptr_t)ptr < (uintptr_t)load_base + load_size) {
     return;
   }
-  // Ignore low sentinel / unmapped addresses
-  if ((uintptr_t)ptr < 0x10000) {
+
+  // 3. glibc malloc chunks on AArch64 are strictly 16-byte aligned.
+  // Passing an unaligned pointer to glibc free() immediately triggers "free(): invalid pointer"!
+  if (((uintptr_t)ptr & 0xF) != 0) {
     return;
   }
+
+  // 4. Verify pointer's header page is mapped in virtual memory
+  unsigned char vec[1];
+  void *page = (void *)(((uintptr_t)ptr - 16) & ~4095UL);
+  if (mincore(page, 4096, vec) != 0) {
+    return;
+  }
+
+  // 5. Glibc malloc chunk header check
+  // For any allocated chunk, the size field at ((size_t*)ptr)[-1] must be >= 32
+  // and multiple of 16 (on aarch64), and reasonably bounded.
+  size_t chunk_header = ((size_t *)ptr)[-1];
+  size_t chunk_size = chunk_header & ~0x7UL;
+  if (chunk_size < 32 || (chunk_size & 0xF) != 0 || chunk_size > 0x1000000000ULL) {
+    fprintf(stderr, "[bionic_free] Ignored invalid chunk ptr=%p (header=0x%zx)\n", ptr, chunk_header);
+    return;
+  }
+
   free(ptr);
 }
 
