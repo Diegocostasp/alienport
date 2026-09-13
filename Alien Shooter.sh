@@ -129,6 +129,7 @@ fi
 # 8. Ambiente de Execução
 mkdir -p "$GAMEDIR/savedata"
 export LD_LIBRARY_PATH="$GAMEDIR/lib:$GAMEDIR:$LD_LIBRARY_PATH"
+export MALLOC_CHECK_=0
 [ -n "$sdl_controllerconfig" ] && export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 
 # Teste de dependências (ldd)
@@ -146,6 +147,7 @@ fi
 
 # 10. Executa o jogo
 echo "Executando: ./alienport $GAMEDIR"
+ulimit -c 0 2>/dev/null || true
 ./alienport "$GAMEDIR"
 EXIT_CODE=$?
 
@@ -170,5 +172,6 @@ if [ $EXIT_CODE -ne 0 ]; then
   sleep 10
 fi
 
+[ -n "$CUR_TTY" ] && [ -w "$CUR_TTY" ] && printf "\033c" > "$CUR_TTY" 2>/dev/null || true
 printf "\033c" > /dev/tty0 2>/dev/null || true
 exit $EXIT_CODE
