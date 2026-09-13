@@ -211,57 +211,137 @@ static void *jni_GetStaticFieldID(void *env, void *clazz, const char *name, cons
   return (void *)stub_field(name, sig);
 }
 
-static void *jni_CallObjectMethod(void *env, void *obj, void *methodID, ...) {
-  (void)env; (void)obj;
+static void *jni_GetObjectClass(void *env, void *obj) {
+  (void)env;
+  if (!obj) return (void *)CLASS_COMMON_ACTIVITY;
+  return obj;
+}
+
+static void *jni_CallObjectMethodV(void *env, void *obj, void *methodID, va_list ap) {
+  (void)env; (void)obj; (void)ap;
   uintptr_t mid = (uintptr_t)methodID;
   if (mid == MID_GET_PACKAGE_NAME) return make_jstring("com.sigmateam.alienshootermobile");
   if (mid == MID_GET_STRING) return make_jstring("");
   if (mid == MID_ASSETS_PATH) return make_jstring(asset_shim_get_gamedir());
+  if (mid == MID_GET_CLASS_LOADER) return (void *)CLASS_CLASS_LOADER;
+  if (mid == MID_LOAD_CLASS) return (void *)CLASS_COMMON_ACTIVITY;
+  return (void *)1;
+}
+
+static void *jni_CallObjectMethod(void *env, void *obj, void *methodID, ...) {
+  va_list ap;
+  va_start(ap, methodID);
+  void *res = jni_CallObjectMethodV(env, obj, methodID, ap);
+  va_end(ap);
+  return res;
+}
+
+static void *jni_CallStaticObjectMethodV(void *env, void *clazz, void *methodID, va_list ap) {
+  (void)env; (void)clazz; (void)ap;
+  uintptr_t mid = (uintptr_t)methodID;
+  if (mid == MID_GET_PACKAGE_NAME) return make_jstring("com.sigmateam.alienshootermobile");
+  if (mid == MID_GET_CLASS_LOADER) return (void *)CLASS_CLASS_LOADER;
+  if (mid == MID_LOAD_CLASS) return (void *)CLASS_COMMON_ACTIVITY;
   return (void *)1;
 }
 
 static void *jni_CallStaticObjectMethod(void *env, void *clazz, void *methodID, ...) {
-  (void)env; (void)clazz;
-  uintptr_t mid = (uintptr_t)methodID;
-  if (mid == MID_GET_PACKAGE_NAME) return make_jstring("com.sigmateam.alienshootermobile");
-  return (void *)1;
+  va_list ap;
+  va_start(ap, methodID);
+  void *res = jni_CallStaticObjectMethodV(env, clazz, methodID, ap);
+  va_end(ap);
+  return res;
 }
 
-static int jni_CallIntMethod(void *env, void *obj, void *methodID, ...) {
-  (void)env; (void)obj;
+static int jni_CallIntMethodV(void *env, void *obj, void *methodID, va_list ap) {
+  (void)env; (void)obj; (void)ap;
   uintptr_t mid = (uintptr_t)methodID;
   if (mid == MID_GET_INT) return 0;
   return 1;
 }
 
-static int jni_CallStaticIntMethod(void *env, void *clazz, void *methodID, ...) {
-  (void)env; (void)clazz; (void)methodID;
+static int jni_CallIntMethod(void *env, void *obj, void *methodID, ...) {
+  va_list ap;
+  va_start(ap, methodID);
+  int res = jni_CallIntMethodV(env, obj, methodID, ap);
+  va_end(ap);
+  return res;
+}
+
+static int jni_CallStaticIntMethodV(void *env, void *clazz, void *methodID, va_list ap) {
+  (void)env; (void)clazz; (void)methodID; (void)ap;
   return 1;
 }
 
-static unsigned char jni_CallBooleanMethod(void *env, void *obj, void *methodID, ...) {
-  (void)env; (void)obj;
+static int jni_CallStaticIntMethod(void *env, void *clazz, void *methodID, ...) {
+  va_list ap;
+  va_start(ap, methodID);
+  int res = jni_CallStaticIntMethodV(env, clazz, methodID, ap);
+  va_end(ap);
+  return res;
+}
+
+static unsigned char jni_CallBooleanMethodV(void *env, void *obj, void *methodID, va_list ap) {
+  (void)env; (void)obj; (void)ap;
   uintptr_t mid = (uintptr_t)methodID;
   if (mid == MID_IS_LEGAL) return 1;
   return 1;
 }
 
-static unsigned char jni_CallStaticBooleanMethod(void *env, void *clazz, void *methodID, ...) {
-  (void)env; (void)clazz; (void)methodID;
+static unsigned char jni_CallBooleanMethod(void *env, void *obj, void *methodID, ...) {
+  va_list ap;
+  va_start(ap, methodID);
+  unsigned char res = jni_CallBooleanMethodV(env, obj, methodID, ap);
+  va_end(ap);
+  return res;
+}
+
+static unsigned char jni_CallStaticBooleanMethodV(void *env, void *clazz, void *methodID, va_list ap) {
+  (void)env; (void)clazz; (void)methodID; (void)ap;
   return 1;
 }
 
-static float jni_CallFloatMethod(void *env, void *obj, void *methodID, ...) {
-  (void)env; (void)obj; (void)methodID;
+static unsigned char jni_CallStaticBooleanMethod(void *env, void *clazz, void *methodID, ...) {
+  va_list ap;
+  va_start(ap, methodID);
+  unsigned char res = jni_CallStaticBooleanMethodV(env, clazz, methodID, ap);
+  va_end(ap);
+  return res;
+}
+
+static float jni_CallFloatMethodV(void *env, void *obj, void *methodID, va_list ap) {
+  (void)env; (void)obj; (void)methodID; (void)ap;
   return 0.0f;
 }
 
+static float jni_CallFloatMethod(void *env, void *obj, void *methodID, ...) {
+  va_list ap;
+  va_start(ap, methodID);
+  float res = jni_CallFloatMethodV(env, obj, methodID, ap);
+  va_end(ap);
+  return res;
+}
+
+static void jni_CallVoidMethodV(void *env, void *obj, void *methodID, va_list ap) {
+  (void)env; (void)obj; (void)methodID; (void)ap;
+}
+
 static void jni_CallVoidMethod(void *env, void *obj, void *methodID, ...) {
-  (void)env; (void)obj; (void)methodID;
+  va_list ap;
+  va_start(ap, methodID);
+  jni_CallVoidMethodV(env, obj, methodID, ap);
+  va_end(ap);
+}
+
+static void jni_CallStaticVoidMethodV(void *env, void *clazz, void *methodID, va_list ap) {
+  (void)env; (void)clazz; (void)methodID; (void)ap;
 }
 
 static void jni_CallStaticVoidMethod(void *env, void *clazz, void *methodID, ...) {
-  (void)env; (void)clazz; (void)methodID;
+  va_list ap;
+  va_start(ap, methodID);
+  jni_CallStaticVoidMethodV(env, clazz, methodID, ap);
+  va_end(ap);
 }
 
 static int jni_GetIntField(void *env, void *obj, void *fieldID) {
@@ -302,7 +382,7 @@ static void *jni_NewStringUTF(void *env, const char *bytes) {
 
 static int jni_RegisterNatives(void *env, void *clazz, const void *methods, int nMethods) {
   (void)env; (void)clazz; (void)methods; (void)nMethods;
-  printf("[jni] RegisterNatives called for %d methods\n", nMethods);
+  printf("[jni] RegisterNatives called for %d methods (bypassed/ok)\n", nMethods);
   return 0;
 }
 
@@ -366,38 +446,52 @@ void jni_shim_init(const char *gamedir) {
     java_vm_vtable[i] = (uintptr_t)jni_stub_ret0;
   }
 
-  /* JavaVM vtable offsets */
+  /* JavaVM vtable official indices */
   java_vm_vtable[3] = (uintptr_t)vm_DetachCurrentThread;
   java_vm_vtable[4] = (uintptr_t)vm_AttachCurrentThread;
+  java_vm_vtable[5] = (uintptr_t)vm_DetachCurrentThread;
   java_vm_vtable[6] = (uintptr_t)vm_GetEnv;
   java_vm_vtable[7] = (uintptr_t)vm_AttachCurrentThread;
 
-  /* JNIEnv vtable standard indices */
+  /* JNIEnv vtable official Android NDK indices */
   jni_env_vtable[6] = (uintptr_t)jni_FindClass;
   jni_env_vtable[19] = (uintptr_t)jni_PushLocalFrame;
   jni_env_vtable[20] = (uintptr_t)jni_PopLocalFrame;
   jni_env_vtable[21] = (uintptr_t)jni_NewGlobalRef;
   jni_env_vtable[22] = (uintptr_t)jni_DeleteGlobalRef;
   jni_env_vtable[23] = (uintptr_t)jni_DeleteLocalRef;
-  jni_env_vtable[31] = (uintptr_t)jni_GetMethodID;
+  jni_env_vtable[31] = (uintptr_t)jni_GetObjectClass;
+  jni_env_vtable[33] = (uintptr_t)jni_GetMethodID;
   jni_env_vtable[34] = (uintptr_t)jni_CallObjectMethod;
-  jni_env_vtable[49] = (uintptr_t)jni_CallBooleanMethod;
-  jni_env_vtable[55] = (uintptr_t)jni_CallIntMethod;
-  jni_env_vtable[61] = (uintptr_t)jni_CallFloatMethod;
-  jni_env_vtable[67] = (uintptr_t)jni_CallVoidMethod;
+  jni_env_vtable[35] = (uintptr_t)jni_CallObjectMethodV;
+  jni_env_vtable[37] = (uintptr_t)jni_CallBooleanMethod;
+  jni_env_vtable[38] = (uintptr_t)jni_CallBooleanMethodV;
+  jni_env_vtable[49] = (uintptr_t)jni_CallIntMethod;
+  jni_env_vtable[50] = (uintptr_t)jni_CallIntMethodV;
+  jni_env_vtable[55] = (uintptr_t)jni_CallFloatMethod;
+  jni_env_vtable[56] = (uintptr_t)jni_CallFloatMethodV;
+  jni_env_vtable[61] = (uintptr_t)jni_CallVoidMethod;
+  jni_env_vtable[62] = (uintptr_t)jni_CallVoidMethodV;
   jni_env_vtable[94] = (uintptr_t)jni_GetFieldID;
   jni_env_vtable[95] = (uintptr_t)jni_GetObjectField;
   jni_env_vtable[100] = (uintptr_t)jni_GetIntField;
   jni_env_vtable[102] = (uintptr_t)jni_GetFloatField;
   jni_env_vtable[113] = (uintptr_t)jni_GetStaticMethodID;
-  jni_env_vtable[116] = (uintptr_t)jni_CallStaticObjectMethod;
-  jni_env_vtable[131] = (uintptr_t)jni_CallStaticBooleanMethod;
-  jni_env_vtable[137] = (uintptr_t)jni_CallStaticIntMethod;
-  jni_env_vtable[149] = (uintptr_t)jni_CallStaticVoidMethod;
+  jni_env_vtable[114] = (uintptr_t)jni_CallStaticObjectMethod;
+  jni_env_vtable[115] = (uintptr_t)jni_CallStaticObjectMethodV;
+  jni_env_vtable[117] = (uintptr_t)jni_CallStaticBooleanMethod;
+  jni_env_vtable[118] = (uintptr_t)jni_CallStaticBooleanMethodV;
+  jni_env_vtable[129] = (uintptr_t)jni_CallStaticIntMethod;
+  jni_env_vtable[130] = (uintptr_t)jni_CallStaticIntMethodV;
+  jni_env_vtable[141] = (uintptr_t)jni_CallStaticVoidMethod;
+  jni_env_vtable[142] = (uintptr_t)jni_CallStaticVoidMethodV;
   jni_env_vtable[144] = (uintptr_t)jni_GetStaticFieldID;
   jni_env_vtable[163] = (uintptr_t)jni_NewStringUTF;
   jni_env_vtable[165] = (uintptr_t)jni_GetStringUTFChars;
   jni_env_vtable[166] = (uintptr_t)jni_ReleaseStringUTFChars;
+  jni_env_vtable[167] = (uintptr_t)jni_NewStringUTF;
+  jni_env_vtable[169] = (uintptr_t)jni_GetStringUTFChars;
+  jni_env_vtable[170] = (uintptr_t)jni_ReleaseStringUTFChars;
   jni_env_vtable[215] = (uintptr_t)jni_RegisterNatives;
   jni_env_vtable[219] = (uintptr_t)jni_GetJavaVM;
 

@@ -29,16 +29,12 @@
 #include "opensles_shim.h"
 #include "so_util.h"
 
-/* DRM / License bypass hooks */
-static int hook_is_legal(void) {
+/* DRM / License / Java method bypass hooks */
+static int hook_ret1(void) {
   return 1;
 }
 
-static int hook_check_certificate(void) {
-  return 1;
-}
-
-static int hook_ad_init(void) {
+static int hook_ret0(void) {
   return 0;
 }
 
@@ -156,37 +152,62 @@ int main(int argc, char *argv[]) {
   printf("[main] Resolvendo símbolos de importação com a libc/shims...\n");
   so_resolve(dynlib_functions, dynlib_num_functions, 1);
 
-  /* 4. Trava de Licença e Certificado: Força retorno 1 (Legal / Full Game) */
+  /* 4. Trava de Licença, Certificado e Registro JNI */
   so_make_text_writable();
 
   uintptr_t is_legal_app = so_find_addr("_ZNK4core11Application7isLegalEv");
   if (is_legal_app) {
-    hook_arm64(is_legal_app, (uintptr_t)hook_is_legal);
+    hook_arm64(is_legal_app, (uintptr_t)hook_ret1);
     printf("[main] Hooked Application::isLegal -> 1\n");
   }
 
   uintptr_t is_legal_native = so_find_addr("_ZNK7android17ApplicationNative7isLegalEv");
   if (is_legal_native) {
-    hook_arm64(is_legal_native, (uintptr_t)hook_is_legal);
+    hook_arm64(is_legal_native, (uintptr_t)hook_ret1);
     printf("[main] Hooked ApplicationNative::isLegal -> 1\n");
   }
 
   uintptr_t cert_app = so_find_addr("_ZN4core11Application23checkPackageCertificateEv");
   if (cert_app) {
-    hook_arm64(cert_app, (uintptr_t)hook_check_certificate);
+    hook_arm64(cert_app, (uintptr_t)hook_ret1);
     printf("[main] Hooked Application::checkPackageCertificate -> 1\n");
   }
 
   uintptr_t cert_native = so_find_addr("_ZN7android17ApplicationNative23checkPackageCertificateEv");
   if (cert_native) {
-    hook_arm64(cert_native, (uintptr_t)hook_check_certificate);
+    hook_arm64(cert_native, (uintptr_t)hook_ret1);
     printf("[main] Hooked ApplicationNative::checkPackageCertificate -> 1\n");
   }
 
   uintptr_t ad_init = so_find_addr("_ZN2ad21AdvertisementProvider10initializeEv");
   if (ad_init) {
-    hook_arm64(ad_init, (uintptr_t)hook_ad_init);
+    hook_arm64(ad_init, (uintptr_t)hook_ret0);
     printf("[main] Hooked AdvertisementProvider::initialize -> 0\n");
+  }
+
+  /* Força registro bem-sucedido de métodos JNIpp para evitar abort em ApplicationNative::run() */
+  uintptr_t reg_methods = so_find_addr("_ZN5jnipp12NativeMethod18registerAllMethodsEv");
+  if (reg_methods) {
+    hook_arm64(reg_methods, (uintptr_t)hook_ret1);
+    printf("[main] Hooked NativeMethod::registerAllMethods -> 1\n");
+  }
+
+  /* Desativa verificações e telas de bloqueio do Google Play / Licença */
+  const char *license_hooks_ret0[] = {
+    "_ZN7android21LicenseCheckerService10startCheckEv",
+    "_ZN7android21LicenseCheckerService18showPaywallAndExitEv",
+    "_ZN7android21LicenseCheckerService10initializeERKN4core14EngineDelegateE",
+    "_ZN7android21LicenseCheckerService12createHelperEv",
+    "_ZN7android17ApplicationNative17licenseStartCheckEv",
+    "_ZN7android17ApplicationNative25licenseShowPaywallAndExitEv",
+    "_ZN4core11Application25licenseShowPaywallAndExitEv",
+  };
+  for (size_t i = 0; i < sizeof(license_hooks_ret0) / sizeof(license_hooks_ret0[0]); i++) {
+    uintptr_t h_addr = so_find_addr(license_hooks_ret0[i]);
+    if (h_addr) {
+      hook_arm64(h_addr, (uintptr_t)hook_ret0);
+      printf("[main] Hooked %s -> 0\n", license_hooks_ret0[i]);
+    }
   }
 
   /* 5. Executa construtores (.init_array) */
@@ -226,13 +247,9 @@ int main(int argc, char *argv[]) {
   printf("[main] Real android_app: %p (msgread=%d, msgwrite=%d, window=%p)\n",
          real_app, real_app->msgread, real_app->msgwrite, window);
 
-  /* 10. Dispara os eventos de ciclo de vida na ordem do Android NativeActivity */
+  /* 10. Dispara os eventos de ciclo de vida na ordem padrão do Android NativeActivity */
   printf("[main] Notificando inicialização da janela e ciclo de vida...\n");
   if (app->activity->callbacks) {
-    if (app->activity->callbacks->onNativeWindowCreated) {
-      printf("[main] Calling callbacks->onNativeWindowCreated (window=%p)...\n", window);
-      app->activity->callbacks->onNativeWindowCreated(app->activity, window);
-    }
     if (app->activity->callbacks->onStart) {
       printf("[main] Calling callbacks->onStart...\n");
       app->activity->callbacks->onStart(app->activity);
@@ -240,6 +257,10 @@ int main(int argc, char *argv[]) {
     if (app->activity->callbacks->onResume) {
       printf("[main] Calling callbacks->onResume...\n");
       app->activity->callbacks->onResume(app->activity);
+    }
+    if (app->activity->callbacks->onNativeWindowCreated) {
+      printf("[main] Calling callbacks->onNativeWindowCreated (window=%p)...\n", window);
+      app->activity->callbacks->onNativeWindowCreated(app->activity, window);
     }
     if (app->activity->callbacks->onWindowFocusChanged) {
       printf("[main] Calling callbacks->onWindowFocusChanged...\n");

@@ -335,6 +335,7 @@ struct android_app *android_shim_init(void) {
   g_activity.callbacks = &g_callbacks;
   g_activity.vm = jni_get_vm();
   g_activity.env = jni_get_env();
+  g_activity.clazz = (void *)1;
   g_activity.internalDataPath = asset_shim_get_savedir();
   g_activity.externalDataPath = asset_shim_get_savedir();
   g_activity.sdkVersion = 28;
