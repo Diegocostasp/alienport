@@ -21,6 +21,9 @@ extern const unsigned char *_ctype_;
 int *bionic_errno(void);
 int bionic_system_property_get(const char *name, char *value);
 void bionic_set_abort_message(const char *msg);
+void *bionic_malloc(size_t size);
+void *bionic_calloc(size_t n, size_t size);
+void *bionic_realloc(void *ptr, size_t size);
 void bionic_free(void *ptr);
 void bionic_delete(void *ptr);
 void bionic_delete_sized(void *ptr, size_t sz);
@@ -30,6 +33,7 @@ int __android_log_write(int prio, const char *tag, const char *text);
 int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list ap);
 
 void __stack_chk_fail(void);
+void bionic_stack_chk_fail(void);
 
 /* Android FORTIFY Shims */
 void *bionic_memcpy_chk(void *dest, const void *src, size_t len, size_t destlen);

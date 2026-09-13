@@ -250,3 +250,32 @@ int bionic_poll_chk(void *fds, unsigned int nfds, int timeout, size_t buflen) {
   (void)buflen;
   return poll((struct pollfd *)fds, nfds, timeout);
 }
+
+void bionic_stack_chk_fail(void) {
+  void *caller = __builtin_return_address(0);
+  uintptr_t lr = (uintptr_t)caller;
+  fprintf(stderr, "\n==================== STACK SMASHING DETECTADO ====================\n");
+  fprintf(stderr, "[bionic] __stack_chk_fail() chamado diretamente por: %p", caller);
+  if (load_base && lr >= (uintptr_t)load_base && lr < (uintptr_t)load_base + load_size) {
+    fprintf(stderr, " (libalien_shooter.so offset: +0x%lx)\n", (unsigned long)(lr - (uintptr_t)load_base));
+  } else {
+    fprintf(stderr, "\n");
+  }
+
+  uintptr_t fp = (uintptr_t)__builtin_frame_address(0);
+  fprintf(stderr, "[bionic] Call stack unwind:\n");
+  for (int i = 0; i < 24 && fp && (fp & 7) == 0; i++) {
+    uintptr_t next_fp = *(uintptr_t *)fp;
+    uintptr_t ret = *(uintptr_t *)(fp + 8);
+    fprintf(stderr, "  #%02d fp=%p lr=%p", i, (void *)fp, (void *)ret);
+    if (load_base && ret >= (uintptr_t)load_base && ret < (uintptr_t)load_base + load_size) {
+      fprintf(stderr, " (libalien_shooter.so +0x%lx)", (unsigned long)(ret - (uintptr_t)load_base));
+    }
+    fprintf(stderr, "\n");
+    if (next_fp <= fp || (next_fp - fp) > 0x200000) break;
+    fp = next_fp;
+  }
+  fprintf(stderr, "===================================================================\n");
+  fflush(stderr);
+  abort();
+}

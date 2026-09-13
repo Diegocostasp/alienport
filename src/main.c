@@ -54,10 +54,14 @@ static void hook_void(void) {
 static char g_assets_path[PATH_MAX];
 
 /* BundleManagerPrivate::initialize() -> retorna true (sucesso)
- * Isso impede que AssetPackManager_init seja chamada. */
+ * Marca m_initialized (offset 0xb8) = 1 para evitar loop de re-inicialização */
 static int hook_bundle_init(void *this_ptr) {
-  (void)this_ptr;
-  printf("[hook] BundleManagerPrivate::initialize() -> true (bypass playcore)\n");
+  void *caller = __builtin_return_address(0);
+  printf("[hook] BundleManagerPrivate::initialize(this=%p) -> true (called from %p)\n",
+         this_ptr, caller);
+  if (this_ptr) {
+    *(uint8_t *)((uintptr_t)this_ptr + 0xb8) = 1; // mark initialized
+  }
   return 1;
 }
 
@@ -153,6 +157,21 @@ static void crash_handler(int sig, siginfo_t *info, void *uctx) {
               (i % 3 == 2 || i == 30) ? "\n" : "");
     }
     fprintf(stderr, "  sp  = 0x%016lx\n", (unsigned long)uc->uc_mcontext.sp);
+
+    fprintf(stderr, "Call stack unwind (frame pointer chain):\n");
+    uintptr_t cur_fp = uc->uc_mcontext.regs[29];
+    for (int i = 0; i < 24 && cur_fp && (cur_fp & 7) == 0; i++) {
+      uintptr_t *fp_ptr = (uintptr_t *)cur_fp;
+      uintptr_t next_fp = fp_ptr[0];
+      uintptr_t lr = fp_ptr[1];
+      fprintf(stderr, "  #%02d fp=%p lr=%p", i, (void *)cur_fp, (void *)lr);
+      if (text_base && lr >= (uintptr_t)text_base && lr < (uintptr_t)text_base + text_size) {
+        fprintf(stderr, " (libalien_shooter.so offset: +0x%lx)", (unsigned long)(lr - (uintptr_t)text_base));
+      }
+      fprintf(stderr, "\n");
+      if (next_fp <= cur_fp || (next_fp - cur_fp) > 0x200000) break;
+      cur_fp = next_fp;
+    }
   }
   fprintf(stderr, "============================================================\n");
   fflush(stderr);
@@ -427,6 +446,29 @@ int main(int argc, char *argv[]) {
   }
 
   printf("[main] === BundleManager/PlayCore bypass completo! ===\n");
+
+  /* Patch: Neutraliza a checagem do canário de stack do GameThread::handleEvents.
+   * Devido à transição entre threads glibc e convenções Android NDK no ARM64,
+   * o frame canary do handleEvents gerava falso positivo e abortava com código 134.
+   * Substituímos os saltos condicionais b.ne __stack_chk_fail por NOP. */
+  uintptr_t handle_events = so_find_addr("_ZN7android10GameThread12handleEventsEb");
+  if (handle_events) {
+    so_make_text_writable();
+    uint32_t *chk1 = (uint32_t *)(handle_events + 0x410);
+    uint32_t *chk2 = (uint32_t *)(handle_events + 0x470);
+    if (*chk1 == 0x54000361) {
+      *chk1 = 0xd503201f; // NOP
+      printf("[main] Patched GameThread::handleEvents stack canary check #1 (0x%lx) -> NOP\n",
+             (unsigned long)(handle_events + 0x410 - (uintptr_t)text_base));
+    }
+    if (*chk2 == 0x54000061) {
+      *chk2 = 0xd503201f; // NOP
+      printf("[main] Patched GameThread::handleEvents stack canary check #2 (0x%lx) -> NOP\n",
+             (unsigned long)(handle_events + 0x470 - (uintptr_t)text_base));
+    }
+    so_make_text_executable();
+    so_flush_caches();
+  }
 
   /* 5. Executa construtores (.init_array) */
   printf("[main] Executando construtores (.init_array)...\n");

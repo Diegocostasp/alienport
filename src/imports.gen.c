@@ -115,7 +115,7 @@ DynLibFunction dynlib_functions[] = {
   {"__read_chk", (uintptr_t)bionic_read_chk},
   {"__register_atfork", (uintptr_t)__register_atfork},
   {"__sF", (uintptr_t)__sF},
-  {"__stack_chk_fail", (uintptr_t)__stack_chk_fail},
+  {"__stack_chk_fail", (uintptr_t)bionic_stack_chk_fail},
   {"__strchr_chk", (uintptr_t)bionic_strchr_chk},
   {"__strcpy_chk", (uintptr_t)bionic_strcpy_chk},
   {"__strlen_chk", (uintptr_t)bionic_strlen_chk},
