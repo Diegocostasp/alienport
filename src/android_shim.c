@@ -589,6 +589,5 @@ float AMotionEvent_getY(void *event, size_t pointer_index) {
 
 void ANativeActivity_finish(ANativeActivity *activity) {
   (void)activity;
-  printf("[android_shim] ANativeActivity_finish called -> exiting\n");
-  exit(0);
+  printf("[android_shim] AVISO: ANativeActivity_finish chamado! Ignorando saida forcada para manter o jogo rodando.\n");
 }

@@ -60,6 +60,8 @@ static void crash_handler(int sig, siginfo_t *info, void *uctx) {
   }
   fprintf(stderr, "============================================================\n");
   fflush(stderr);
+  fflush(stdout);
+  sync();
   _exit(128 + sig);
 }
 
@@ -192,15 +194,16 @@ int main(int argc, char *argv[]) {
     printf("[main] Hooked NativeMethod::registerAllMethods -> 1\n");
   }
 
-  /* Desativa verificações e telas de bloqueio do Google Play / Licença */
+  /* Desativa verificações de licença, paywalls e saídas forçadas */
   const char *license_hooks_ret0[] = {
     "_ZN7android21LicenseCheckerService10startCheckEv",
     "_ZN7android21LicenseCheckerService18showPaywallAndExitEv",
-    "_ZN7android21LicenseCheckerService10initializeERKN4core14EngineDelegateE",
-    "_ZN7android21LicenseCheckerService12createHelperEv",
     "_ZN7android17ApplicationNative17licenseStartCheckEv",
     "_ZN7android17ApplicationNative25licenseShowPaywallAndExitEv",
     "_ZN4core11Application25licenseShowPaywallAndExitEv",
+    "_ZN7android17ApplicationNative11forceFinishEv",
+    "_ZN7android17ApplicationNative4exitEv",
+    "_ZN4core11Application4exitEv",
   };
   for (size_t i = 0; i < sizeof(license_hooks_ret0) / sizeof(license_hooks_ret0[0]); i++) {
     uintptr_t h_addr = so_find_addr(license_hooks_ret0[i]);
