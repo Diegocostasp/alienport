@@ -32,14 +32,15 @@ SDL_Window *egl_shim_get_window(void) {
 }
 
 EGLDisplay egl_shim_eglGetDisplay(EGLNativeDisplayType display_id) {
-  (void)display_id;
+  printf("[egl] eglGetDisplay(display_id=%p) -> 0x1\n", (void *)display_id);
   return (EGLDisplay)(uintptr_t)0x1;
 }
 
 EGLBoolean egl_shim_eglInitialize(EGLDisplay dpy, EGLint *major, EGLint *minor) {
-  (void)dpy;
   if (major) *major = 1;
   if (minor) *minor = 4;
+  printf("[egl] eglInitialize(dpy=%p) -> version %d.%d (EGL_TRUE)\n",
+         (void *)dpy, major ? *major : 0, minor ? *minor : 0);
   return EGL_TRUE;
 }
 
@@ -51,6 +52,8 @@ EGLBoolean egl_shim_eglChooseConfig(EGLDisplay dpy, const EGLint *attrib_list,
   if (configs && config_size > 0) {
     configs[0] = (EGLConfig)(uintptr_t)0x1;
   }
+  printf("[egl] eglChooseConfig(dpy=%p, config_size=%d) -> 1 config\n",
+         (void *)dpy, config_size);
   return EGL_TRUE;
 }
 
@@ -98,7 +101,8 @@ EGLContext egl_shim_eglCreateContext(EGLDisplay dpy, EGLConfig config,
   wrap->id = g_next_context_id++;
   pthread_mutex_unlock(&g_egl_lock);
 
-  printf("[egl_shim] Context #%d created\n", wrap->id);
+  printf("[egl] eglCreateContext(dpy=%p, share=%p) -> Context #%d created\n",
+         (void *)dpy, (void *)share_context, wrap->id);
   return (EGLContext)wrap;
 }
 
@@ -106,6 +110,8 @@ EGLSurface egl_shim_eglCreateWindowSurface(EGLDisplay dpy, EGLConfig config,
                                           EGLNativeWindowType win,
                                           const EGLint *attrib_list) {
   (void)dpy; (void)config; (void)win; (void)attrib_list;
+  printf("[egl] eglCreateWindowSurface(dpy=%p, win=%p) -> 0x2\n",
+         (void *)dpy, (void *)win);
   return (EGLSurface)(uintptr_t)0x2;
 }
 
@@ -117,21 +123,27 @@ EGLBoolean egl_shim_eglMakeCurrent(EGLDisplay dpy, EGLSurface draw,
   if (!ctx || ctx == EGL_NO_CONTEXT) {
     SDL_GL_MakeCurrent(g_window, NULL);
     g_current_context = NULL;
+    printf("[egl] eglMakeCurrent(ctx=NULL) -> unbound\n");
     return EGL_TRUE;
   }
 
   EglContextWrapper *wrap = (EglContextWrapper *)ctx;
   if (SDL_GL_MakeCurrent(g_window, wrap->sdl_context) == 0) {
     g_current_context = wrap;
+    printf("[egl] eglMakeCurrent(ctx=#%d) -> SUCCESS\n", wrap->id);
     return EGL_TRUE;
   }
 
-  fprintf(stderr, "[egl_shim] SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
+  fprintf(stderr, "[egl] SDL_GL_MakeCurrent failed: %s\n", SDL_GetError());
   return EGL_FALSE;
 }
 
 EGLBoolean egl_shim_eglSwapBuffers(EGLDisplay dpy, EGLSurface surface) {
   (void)dpy; (void)surface;
+  static int swap_count = 0;
+  if (swap_count < 5) {
+    printf("[egl] eglSwapBuffers (frame #%d)\n", ++swap_count);
+  }
   if (g_window) {
     SDL_GL_SwapWindow(g_window);
     return EGL_TRUE;

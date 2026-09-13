@@ -205,6 +205,7 @@ int32_t AConfiguration_getScreenLong(void *config) {
 }
 
 int ANativeWindow_setBuffersGeometry(void *window, int width, int height, int format) {
-  (void)window; (void)width; (void)height; (void)format;
+  printf("[asset] ANativeWindow_setBuffersGeometry(win=%p, %dx%d, format=%d)\n",
+         window, width, height, format);
   return 0;
 }
