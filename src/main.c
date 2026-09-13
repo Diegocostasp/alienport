@@ -38,6 +38,102 @@ static int hook_ret0(void) {
   return 0;
 }
 
+static void hook_void(void) {
+  return;
+}
+
+/* ===== Google Play Core / BundleManager Bypass Hooks ===== */
+
+/*
+ * O jogo usa a Google Play Core Library (playcore) para gerenciar
+ * asset packs via BundleManager. No Android, ele chama
+ * AssetPackManager_init() que requer a Play Store.
+ * Nós interceptamos todo esse fluxo para usar assets locais.
+ */
+
+static char g_assets_path[PATH_MAX];
+
+/* BundleManagerPrivate::initialize() -> retorna true (sucesso)
+ * Isso impede que AssetPackManager_init seja chamada. */
+static int hook_bundle_init(void *this_ptr) {
+  (void)this_ptr;
+  printf("[hook] BundleManagerPrivate::initialize() -> true (bypass playcore)\n");
+  return 1;
+}
+
+/* BundleManagerPrivate::update(BundleInfo&) -> retorna true */
+static int hook_bundle_update(void *this_ptr, void *bundle_info) {
+  (void)this_ptr; (void)bundle_info;
+  return 1;
+}
+
+/* AssetPackManager_init -> retorna 0 (ASSET_PACK_NO_ERROR) */
+static int hook_assetpack_init(void *jvm, void *android_context) {
+  (void)jvm; (void)android_context;
+  printf("[hook] AssetPackManager_init -> 0 (bypassed)\n");
+  return 0;
+}
+
+/* Fake AssetPackLocation object */
+static struct {
+  int storage_method;  /* 0 = STORAGE_FILES_APK, 1 = STORAGE_FILES_EXTERNAL */
+  char assets_path[PATH_MAX];
+  char pack_path[PATH_MAX];
+} g_fake_pack_location;
+
+/* AssetPackManager_getAssetPackLocation -> retorna location fake com path local */
+static void *hook_assetpack_get_location(const char *name) {
+  printf("[hook] AssetPackManager_getAssetPackLocation('%s') -> local path\n",
+         name ? name : "null");
+  return &g_fake_pack_location;
+}
+
+/* AssetPackLocation_getAssetsPath -> retorna caminho dos assets locais */
+static const char *hook_assetpack_assets_path(void *location) {
+  (void)location;
+  printf("[hook] AssetPackLocation_getAssetsPath -> %s\n", g_assets_path);
+  return g_assets_path;
+}
+
+/* AssetPackLocation_getStorageMethod -> 0 (STORAGE_FILES_ON_DEVICE) */
+static int hook_assetpack_storage_method(void *location) {
+  (void)location;
+  return 0;
+}
+
+/* AssetPackManager_requestInfo -> retorna 0 (sucesso) */
+static int hook_assetpack_request_info(const char **pack_names, int num_packs) {
+  (void)pack_names; (void)num_packs;
+  printf("[hook] AssetPackManager_requestInfo (bypassed)\n");
+  return 0;
+}
+
+/* AssetPackManager_getDownloadState -> retorna NULL (sem download pendente) */
+static void *hook_assetpack_download_state(const char *name) {
+  (void)name;
+  return NULL;
+}
+
+/* AssetPackManager_destroy -> noop */
+static void hook_assetpack_destroy(void) {
+  printf("[hook] AssetPackManager_destroy (noop)\n");
+}
+
+/* BundleManager::resolvePath -> retorna o path local dos assets */
+static void hook_bundle_resolve_path(void *this_ptr, void *result_string, const void *input_string) {
+  (void)this_ptr; (void)input_string;
+  /* A STRING do engine é um tipo complexo. Ao invés de tentar manipulá-la,
+   * confiamos que o AssetManager shim resolva os caminhos. */
+  printf("[hook] BundleManagerPrivate::resolvePath called (passthrough)\n");
+}
+
+/* isBundleAccessable (namespace anônimo) -> sempre true */
+static int hook_is_bundle_accessable(const char *path) {
+  (void)path;
+  printf("[hook] isBundleAccessable('%s') -> true\n", path ? path : "null");
+  return 1;
+}
+
 static void crash_handler(int sig, siginfo_t *info, void *uctx) {
   ucontext_t *uc = (ucontext_t *)uctx;
   uintptr_t pc = uc ? uc->uc_mcontext.pc : 0;
@@ -212,6 +308,125 @@ int main(int argc, char *argv[]) {
       printf("[main] Hooked %s -> 0\n", license_hooks_ret0[i]);
     }
   }
+
+  /* ===== BundleManager / Google Play Core Bypass ===== */
+  /* O jogo usa playcore para carregar asset packs. Sem Play Store,
+   * AssetPackManager_init falha. Hookamos tudo para usar assets locais. */
+
+  /* Configura caminho dos assets locais */
+  snprintf(g_assets_path, sizeof(g_assets_path), "%s/assets", gamedir);
+  snprintf(g_fake_pack_location.assets_path, sizeof(g_fake_pack_location.assets_path),
+           "%s/assets", gamedir);
+  snprintf(g_fake_pack_location.pack_path, sizeof(g_fake_pack_location.pack_path),
+           "%s", gamedir);
+  g_fake_pack_location.storage_method = 0; /* STORAGE_FILES_ON_DEVICE */
+  printf("[main] Assets path configurado: %s\n", g_assets_path);
+
+  /* Hook principal: BundleManagerPrivate::initialize() -> true */
+  uintptr_t bm_init = so_find_addr("_ZN4core6detail20BundleManagerPrivate10initializeEv");
+  if (bm_init) {
+    hook_arm64(bm_init, (uintptr_t)hook_bundle_init);
+    printf("[main] Hooked BundleManagerPrivate::initialize -> true\n");
+  } else {
+    printf("[main] AVISO: BundleManagerPrivate::initialize não encontrado!\n");
+  }
+
+  /* Hook BundleManagerPrivate::update -> true */
+  uintptr_t bm_update = so_find_addr("_ZN4core6detail20BundleManagerPrivate6updateERNS_13BundleManager10BundleInfoE");
+  if (bm_update) {
+    hook_arm64(bm_update, (uintptr_t)hook_bundle_update);
+    printf("[main] Hooked BundleManagerPrivate::update -> true\n");
+  }
+
+  /* Hook PlayCore C API: AssetPackManager_init -> 0 (success) */
+  uintptr_t apm_init = so_find_addr("AssetPackManager_init");
+  if (apm_init) {
+    hook_arm64(apm_init, (uintptr_t)hook_assetpack_init);
+    printf("[main] Hooked AssetPackManager_init -> 0\n");
+  }
+
+  /* Hook PlayCore: AssetPackManager_destroy -> noop */
+  uintptr_t apm_destroy = so_find_addr("AssetPackManager_destroy");
+  if (apm_destroy) {
+    hook_arm64(apm_destroy, (uintptr_t)hook_assetpack_destroy);
+    printf("[main] Hooked AssetPackManager_destroy -> noop\n");
+  }
+
+  /* Hook PlayCore: AssetPackManager_requestInfo -> 0 (success) */
+  uintptr_t apm_req = so_find_addr("AssetPackManager_requestInfo");
+  if (apm_req) {
+    hook_arm64(apm_req, (uintptr_t)hook_assetpack_request_info);
+    printf("[main] Hooked AssetPackManager_requestInfo -> 0\n");
+  }
+
+  /* Hook PlayCore: AssetPackManager_getAssetPackLocation -> fake local */
+  uintptr_t apm_loc = so_find_addr("AssetPackManager_getAssetPackLocation");
+  if (apm_loc) {
+    hook_arm64(apm_loc, (uintptr_t)hook_assetpack_get_location);
+    printf("[main] Hooked AssetPackManager_getAssetPackLocation -> local\n");
+  }
+
+  /* Hook PlayCore: AssetPackLocation_getAssetsPath -> assets path local */
+  uintptr_t apl_path = so_find_addr("AssetPackLocation_getAssetsPath");
+  if (apl_path) {
+    hook_arm64(apl_path, (uintptr_t)hook_assetpack_assets_path);
+    printf("[main] Hooked AssetPackLocation_getAssetsPath -> %s\n", g_assets_path);
+  }
+
+  /* Hook PlayCore: AssetPackLocation_getStorageMethod -> 0 */
+  uintptr_t apl_storage = so_find_addr("AssetPackLocation_getStorageMethod");
+  if (apl_storage) {
+    hook_arm64(apl_storage, (uintptr_t)hook_assetpack_storage_method);
+    printf("[main] Hooked AssetPackLocation_getStorageMethod -> 0\n");
+  }
+
+  /* Hook PlayCore: AssetPackLocation_destroy -> noop */
+  uintptr_t apl_destroy = so_find_addr("AssetPackLocation_destroy");
+  if (apl_destroy) {
+    hook_arm64(apl_destroy, (uintptr_t)hook_void);
+    printf("[main] Hooked AssetPackLocation_destroy -> noop\n");
+  }
+
+  /* Hook PlayCore: AssetPackManager_getDownloadState -> NULL */
+  uintptr_t apm_ds = so_find_addr("AssetPackManager_getDownloadState");
+  if (apm_ds) {
+    hook_arm64(apm_ds, (uintptr_t)hook_assetpack_download_state);
+    printf("[main] Hooked AssetPackManager_getDownloadState -> NULL\n");
+  }
+
+  /* Hooks adicionais de PlayCore para evitar chamadas à Play Store */
+  const char *playcore_noop_hooks[] = {
+    "AssetPackManager_onResume",
+    "AssetPackManager_onPause",
+    "AssetPackManager_requestRemoval",
+    "AssetPackManager_cancelDownload",
+    "AssetPackManager_requestDownload",
+    "AssetPackManager_getShowCellularDataConfirmationStatus",
+    "AssetPackManager_showCellularDataConfirmation",
+  };
+  for (size_t i = 0; i < sizeof(playcore_noop_hooks) / sizeof(playcore_noop_hooks[0]); i++) {
+    uintptr_t pc_addr = so_find_addr(playcore_noop_hooks[i]);
+    if (pc_addr) {
+      hook_arm64(pc_addr, (uintptr_t)hook_ret0);
+      printf("[main] Hooked %s -> 0\n", playcore_noop_hooks[i]);
+    }
+  }
+
+  /* Hook BundleManagerPrivate::show_cellular_data_confirmation -> noop */
+  uintptr_t bm_cellular = so_find_addr("_ZN4core6detail20BundleManagerPrivate31show_cellular_data_confirmationEv");
+  if (bm_cellular) {
+    hook_arm64(bm_cellular, (uintptr_t)hook_void);
+    printf("[main] Hooked BundleManagerPrivate::show_cellular_data_confirmation -> noop\n");
+  }
+
+  /* Hook BundleManager::bundlesAvailable -> retorna true */
+  uintptr_t bm_avail = so_find_addr("_ZNK4core13BundleManager16bundlesAvailableEv");
+  if (bm_avail) {
+    hook_arm64(bm_avail, (uintptr_t)hook_ret1);
+    printf("[main] Hooked BundleManager::bundlesAvailable -> true\n");
+  }
+
+  printf("[main] === BundleManager/PlayCore bypass completo! ===\n");
 
   /* 5. Executa construtores (.init_array) */
   printf("[main] Executando construtores (.init_array)...\n");
