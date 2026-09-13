@@ -122,6 +122,21 @@ struct android_poll_source {
   void (*process)(struct android_app *app, struct android_poll_source *source);
 };
 
+typedef struct ARect {
+  int32_t left;
+  int32_t top;
+  int32_t right;
+  int32_t bottom;
+} ARect;
+
+typedef struct bionic_mutex_t {
+  uint8_t storage[40];
+} bionic_mutex_t;
+
+typedef struct bionic_cond_t {
+  uint8_t storage[48];
+} bionic_cond_t;
+
 typedef struct android_app {
   void *userData;
   void (*onAppCmd)(struct android_app *app, int32_t cmd);
@@ -134,11 +149,13 @@ typedef struct android_app {
   AInputQueue *inputQueue;
   void *window;
 
+  ARect contentRect;
+
   int activityState;
   int destroyRequested;
 
-  pthread_mutex_t mutex;
-  pthread_cond_t cond;
+  bionic_mutex_t mutex;
+  bionic_cond_t cond;
 
   int msgread;
   int msgwrite;
@@ -154,10 +171,13 @@ typedef struct android_app {
   int redrawNeeded;
   AInputQueue *pendingInputQueue;
   void *pendingWindow;
+  ARect pendingContentRect;
 } android_app;
 
 /* Functions */
 struct android_app *android_shim_init(void);
+struct android_app *android_shim_get_app(void);
+void *android_shim_get_window(void);
 void android_shim_poll_events(void);
 void android_shim_send_cmd(int8_t cmd);
 

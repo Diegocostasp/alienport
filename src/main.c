@@ -220,14 +220,19 @@ int main(int argc, char *argv[]) {
       (void (*)(ANativeActivity *, void *, size_t))on_create_addr;
   create_func(app->activity, NULL, 0);
 
-  /* 10. Dispara os eventos de ciclo de vida */
-  printf("[main] Notificando inicialização da janela e ciclo de vida...\n");
-  android_shim_send_cmd(APP_CMD_INIT_WINDOW);
-  android_shim_send_cmd(APP_CMD_START);
-  android_shim_send_cmd(APP_CMD_RESUME);
-  android_shim_send_cmd(APP_CMD_GAINED_FOCUS);
+  /* Pega a instância real de android_app criada pela engine */
+  struct android_app *real_app = android_shim_get_app();
+  void *window = android_shim_get_window();
+  printf("[main] Real android_app: %p (msgread=%d, msgwrite=%d, window=%p)\n",
+         real_app, real_app->msgread, real_app->msgwrite, window);
 
+  /* 10. Dispara os eventos de ciclo de vida na ordem do Android NativeActivity */
+  printf("[main] Notificando inicialização da janela e ciclo de vida...\n");
   if (app->activity->callbacks) {
+    if (app->activity->callbacks->onNativeWindowCreated) {
+      printf("[main] Calling callbacks->onNativeWindowCreated (window=%p)...\n", window);
+      app->activity->callbacks->onNativeWindowCreated(app->activity, window);
+    }
     if (app->activity->callbacks->onStart) {
       printf("[main] Calling callbacks->onStart...\n");
       app->activity->callbacks->onStart(app->activity);
@@ -235,10 +240,6 @@ int main(int argc, char *argv[]) {
     if (app->activity->callbacks->onResume) {
       printf("[main] Calling callbacks->onResume...\n");
       app->activity->callbacks->onResume(app->activity);
-    }
-    if (app->activity->callbacks->onNativeWindowCreated) {
-      printf("[main] Calling callbacks->onNativeWindowCreated (window=%p)...\n", app->window);
-      app->activity->callbacks->onNativeWindowCreated(app->activity, app->window);
     }
     if (app->activity->callbacks->onWindowFocusChanged) {
       printf("[main] Calling callbacks->onWindowFocusChanged...\n");
@@ -249,7 +250,7 @@ int main(int argc, char *argv[]) {
   printf("[main] Jogo iniciado com sucesso! Entrando no loop principal...\n");
 
   /* Loop principal */
-  while (!app->destroyRequested) {
+  while (!real_app->destroyRequested) {
     android_shim_poll_events();
     usleep(16000); // ~60 FPS
   }

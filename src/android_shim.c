@@ -6,6 +6,7 @@
 #include "egl_shim.h"
 #include "jni_shim.h"
 #include "opensles_shim.h"
+#include "pthread_bridge.h"
 #include <fcntl.h>
 #include <math.h>
 #include <poll.h>
@@ -94,9 +95,21 @@ static void push_motion_event(int action, float x, float y, int pointer_id) {
   input_queue_push(&ev);
 }
 
+struct android_app *android_shim_get_app(void) {
+  if (g_activity.instance) {
+    return (struct android_app *)g_activity.instance;
+  }
+  return &g_app;
+}
+
+void *android_shim_get_window(void) {
+  return (void *)&g_fake_native_window;
+}
+
 void android_shim_send_cmd(int8_t cmd) {
-  if (g_app.msgwrite >= 0) {
-    if (write(g_app.msgwrite, &cmd, sizeof(cmd)) != sizeof(cmd)) {
+  struct android_app *app = android_shim_get_app();
+  if (app && app->msgwrite >= 0) {
+    if (write(app->msgwrite, &cmd, sizeof(cmd)) != sizeof(cmd)) {
       fprintf(stderr, "[android_shim] write cmd %d failed\n", cmd);
     }
   }
@@ -108,38 +121,38 @@ static void process_cmd(struct android_app *app, struct android_poll_source *sou
   if (read(app->msgread, &cmd, sizeof(cmd)) == sizeof(cmd)) {
     switch (cmd) {
     case APP_CMD_INIT_WINDOW:
-      pthread_mutex_lock(&app->mutex);
+      b_mutex_lock(&app->mutex);
       app->window = (void *)&g_fake_native_window;
-      pthread_cond_broadcast(&app->cond);
-      pthread_mutex_unlock(&app->mutex);
+      b_cond_broadcast(&app->cond);
+      b_mutex_unlock(&app->mutex);
       break;
     case APP_CMD_TERM_WINDOW:
-      pthread_mutex_lock(&app->mutex);
+      b_mutex_lock(&app->mutex);
       app->window = NULL;
-      pthread_cond_broadcast(&app->cond);
-      pthread_mutex_unlock(&app->mutex);
+      b_cond_broadcast(&app->cond);
+      b_mutex_unlock(&app->mutex);
       break;
     case APP_CMD_RESUME:
     case APP_CMD_START:
     case APP_CMD_GAINED_FOCUS:
-      pthread_mutex_lock(&app->mutex);
+      b_mutex_lock(&app->mutex);
       app->activityState = 1;
-      pthread_cond_broadcast(&app->cond);
-      pthread_mutex_unlock(&app->mutex);
+      b_cond_broadcast(&app->cond);
+      b_mutex_unlock(&app->mutex);
       break;
     case APP_CMD_PAUSE:
     case APP_CMD_STOP:
     case APP_CMD_LOST_FOCUS:
-      pthread_mutex_lock(&app->mutex);
+      b_mutex_lock(&app->mutex);
       app->activityState = 0;
-      pthread_cond_broadcast(&app->cond);
-      pthread_mutex_unlock(&app->mutex);
+      b_cond_broadcast(&app->cond);
+      b_mutex_unlock(&app->mutex);
       break;
     case APP_CMD_DESTROY:
-      pthread_mutex_lock(&app->mutex);
+      b_mutex_lock(&app->mutex);
       app->destroyRequested = 1;
-      pthread_cond_broadcast(&app->cond);
-      pthread_mutex_unlock(&app->mutex);
+      b_cond_broadcast(&app->cond);
+      b_mutex_unlock(&app->mutex);
       break;
     }
     if (app->onAppCmd) {
@@ -299,8 +312,8 @@ struct android_app *android_shim_init(void) {
   memset(&g_activity, 0, sizeof(g_activity));
   memset(&g_callbacks, 0, sizeof(g_callbacks));
 
-  pthread_mutex_init(&g_app.mutex, NULL);
-  pthread_cond_init(&g_app.cond, NULL);
+  b_mutex_init(&g_app.mutex, NULL);
+  b_cond_init(&g_app.cond, NULL);
 
   int msgpipe[2];
   if (pipe(msgpipe) < 0) {
@@ -371,6 +384,17 @@ struct android_app *android_shim_init(void) {
 
 /* ---------------- ALooper ---------------- */
 
+typedef struct LooperFd {
+  int fd;
+  int ident;
+  int events;
+  void *data;
+} LooperFd;
+
+#define MAX_LOOPER_FDS 16
+static LooperFd g_looper_fds[MAX_LOOPER_FDS];
+static int g_looper_fd_count = 0;
+
 ALooper *ALooper_prepare(int opts) {
   (void)opts;
   static long long fake_looper = 1;
@@ -378,7 +402,23 @@ ALooper *ALooper_prepare(int opts) {
 }
 
 void ALooper_addFd(void *looper, int fd, int ident, int events, void *callback, void *data) {
-  (void)looper; (void)fd; (void)ident; (void)events; (void)callback; (void)data;
+  (void)looper; (void)callback;
+  for (int i = 0; i < g_looper_fd_count; i++) {
+    if (g_looper_fds[i].fd == fd) {
+      g_looper_fds[i].ident = ident;
+      g_looper_fds[i].events = events;
+      g_looper_fds[i].data = data;
+      return;
+    }
+  }
+  if (g_looper_fd_count < MAX_LOOPER_FDS) {
+    g_looper_fds[g_looper_fd_count].fd = fd;
+    g_looper_fds[g_looper_fd_count].ident = ident;
+    g_looper_fds[g_looper_fd_count].events = events;
+    g_looper_fds[g_looper_fd_count].data = data;
+    g_looper_fd_count++;
+    printf("[android_shim] ALooper_addFd: fd=%d, ident=%d, data=%p\n", fd, ident, data);
+  }
 }
 
 int ALooper_pollOnce(int timeoutMillis, int *outFd, int *outEvents, void **outData) {
@@ -391,19 +431,56 @@ int ALooper_pollAll(int timeoutMillis, int *outFd, int *outEvents, void **outDat
   // Pump audio callbacks before any polling
   opensles_shim_pump_callbacks();
 
-  // 1. Check command pipe
-  struct pollfd pfd;
-  pfd.fd = g_app.msgread;
-  pfd.events = POLLIN;
-  pfd.revents = 0;
+  struct android_app *app = android_shim_get_app();
+
+  // Poll all registered looper FDs (including app->msgread)
+  struct pollfd pfds[MAX_LOOPER_FDS + 1];
+  int pfd_count = 0;
+
+  for (int i = 0; i < g_looper_fd_count; i++) {
+    pfds[pfd_count].fd = g_looper_fds[i].fd;
+    pfds[pfd_count].events = POLLIN;
+    pfds[pfd_count].revents = 0;
+    pfd_count++;
+  }
+
+  int found_msgread = 0;
+  for (int i = 0; i < g_looper_fd_count; i++) {
+    if (g_looper_fds[i].fd == app->msgread) {
+      found_msgread = 1;
+      break;
+    }
+  }
+  if (!found_msgread && app->msgread >= 0 && pfd_count < MAX_LOOPER_FDS + 1) {
+    pfds[pfd_count].fd = app->msgread;
+    pfds[pfd_count].events = POLLIN;
+    pfds[pfd_count].revents = 0;
+    pfd_count++;
+  }
 
   int timeout = timeoutMillis;
   if (timeout < 0 || timeout > 5) timeout = 5;
 
-  int ret = poll(&pfd, 1, timeout);
-  if (ret > 0 && (pfd.revents & POLLIN)) {
-    if (outData) *outData = &g_app.cmdPollSource;
-    return LOOPER_ID_MAIN;
+  if (pfd_count > 0) {
+    int ret = poll(pfds, pfd_count, timeout);
+    if (ret > 0) {
+      for (int i = 0; i < pfd_count; i++) {
+        if (pfds[i].revents & POLLIN) {
+          for (int j = 0; j < g_looper_fd_count; j++) {
+            if (g_looper_fds[j].fd == pfds[i].fd) {
+              if (outData) *outData = g_looper_fds[j].data;
+              return g_looper_fds[j].ident;
+            }
+          }
+          if (pfds[i].fd == app->msgread) {
+            if (outData) *outData = &app->cmdPollSource;
+            return LOOPER_ID_MAIN;
+          }
+        }
+      }
+    }
+  } else {
+    if (timeout > 0) usleep(timeout * 1000);
   }
 
   // 2. Poll SDL events
@@ -411,7 +488,7 @@ int ALooper_pollAll(int timeoutMillis, int *outFd, int *outEvents, void **outDat
 
   // 3. Check input queue
   if (input_queue_count() > 0) {
-    if (outData) *outData = &g_app.inputPollSource;
+    if (outData) *outData = &app->inputPollSource;
     return LOOPER_ID_INPUT;
   }
 
