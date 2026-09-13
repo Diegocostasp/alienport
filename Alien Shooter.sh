@@ -9,6 +9,9 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 CUR_TTY="/dev/tty1"
 [ -w "/dev/tty0" ] && CUR_TTY="/dev/tty0"
 
+# Desativa core dump para proteger cartão SD (padrão NextOS)
+ulimit -c 0
+
 # 2. Inicia LOG IMEDIATAMENTE (antes de qualquer include ou comando arriscado)
 LOG_ROOT="$SCRIPT_DIR/alienport_log.txt"
 LOG_TMP="/tmp/alienport.log"
