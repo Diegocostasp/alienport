@@ -25,8 +25,8 @@ size_t text_size;
 void *data_base, *data_virtbase;
 size_t data_size;
 
-static void *load_base, *load_virtbase;
-static size_t load_size;
+void *load_base = NULL, *load_virtbase = NULL;
+size_t load_size = 0;
 
 static void *so_base;
 

@@ -228,14 +228,22 @@ int main(int argc, char *argv[]) {
   android_shim_send_cmd(APP_CMD_GAINED_FOCUS);
 
   if (app->activity->callbacks) {
-    if (app->activity->callbacks->onStart)
+    if (app->activity->callbacks->onStart) {
+      printf("[main] Calling callbacks->onStart...\n");
       app->activity->callbacks->onStart(app->activity);
-    if (app->activity->callbacks->onResume)
+    }
+    if (app->activity->callbacks->onResume) {
+      printf("[main] Calling callbacks->onResume...\n");
       app->activity->callbacks->onResume(app->activity);
-    if (app->activity->callbacks->onNativeWindowCreated)
+    }
+    if (app->activity->callbacks->onNativeWindowCreated) {
+      printf("[main] Calling callbacks->onNativeWindowCreated (window=%p)...\n", app->window);
       app->activity->callbacks->onNativeWindowCreated(app->activity, app->window);
-    if (app->activity->callbacks->onWindowFocusChanged)
+    }
+    if (app->activity->callbacks->onWindowFocusChanged) {
+      printf("[main] Calling callbacks->onWindowFocusChanged...\n");
       app->activity->callbacks->onWindowFocusChanged(app->activity, 1);
+    }
   }
 
   printf("[main] Jogo iniciado com sucesso! Entrando no loop principal...\n");

@@ -19,6 +19,8 @@ typedef struct {
 
 extern void *text_base, *data_base;
 extern size_t text_size, data_size;
+extern void *load_base, *load_virtbase;
+extern size_t load_size;
 
 void hook_arm64(uintptr_t addr, uintptr_t dst);
 

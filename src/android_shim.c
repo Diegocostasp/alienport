@@ -318,15 +318,18 @@ struct android_app *android_shim_init(void) {
   g_app.inputPollSource.app = &g_app;
   g_app.inputPollSource.process = process_input;
 
+  static long long g_fake_asset_manager = 1;
   g_activity.callbacks = &g_callbacks;
   g_activity.vm = jni_get_vm();
   g_activity.env = jni_get_env();
   g_activity.internalDataPath = asset_shim_get_savedir();
   g_activity.externalDataPath = asset_shim_get_savedir();
   g_activity.sdkVersion = 28;
+  g_activity.assetManager = (void *)&g_fake_asset_manager;
 
   g_app.activity = &g_activity;
   g_app.inputQueue = (AInputQueue *)&g_fake_input_queue;
+  g_app.window = (void *)&g_fake_native_window;
 
   /* Initialize SDL2 Video and GameController */
   if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMECONTROLLER | SDL_INIT_AUDIO) < 0) {

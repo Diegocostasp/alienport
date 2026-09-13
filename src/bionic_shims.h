@@ -21,6 +21,9 @@ extern const unsigned char *_ctype_;
 int *bionic_errno(void);
 int bionic_system_property_get(const char *name, char *value);
 void bionic_set_abort_message(const char *msg);
+void bionic_free(void *ptr);
+void bionic_delete(void *ptr);
+void bionic_delete_sized(void *ptr, size_t sz);
 
 int __android_log_print(int prio, const char *tag, const char *fmt, ...);
 int __android_log_write(int prio, const char *tag, const char *text);

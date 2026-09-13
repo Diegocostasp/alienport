@@ -2,6 +2,7 @@
 #define _GNU_SOURCE
 #endif
 #include "bionic_shims.h"
+#include "so_util.h"
 #include <errno.h>
 #include <poll.h>
 #include <signal.h>
@@ -68,6 +69,28 @@ int bionic_system_property_get(const char *name, char *value) {
 
 void bionic_set_abort_message(const char *msg) {
   if (msg) fprintf(stderr, "[bionic-abort] %s\n", msg);
+}
+
+void bionic_free(void *ptr) {
+  if (!ptr) return;
+  // Ignore frees of addresses within the static loaded .so memory (text/data/bss)
+  if (load_base && (uintptr_t)ptr >= (uintptr_t)load_base && (uintptr_t)ptr < (uintptr_t)load_base + load_size) {
+    return;
+  }
+  // Ignore low sentinel / unmapped addresses
+  if ((uintptr_t)ptr < 0x10000) {
+    return;
+  }
+  free(ptr);
+}
+
+void bionic_delete(void *ptr) {
+  bionic_free(ptr);
+}
+
+void bionic_delete_sized(void *ptr, size_t sz) {
+  (void)sz;
+  bionic_free(ptr);
 }
 
 static const char lvl[] = "??VDIWEF";
