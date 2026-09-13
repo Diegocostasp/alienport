@@ -151,8 +151,8 @@ fi
 # 10. Executa o jogo
 echo "Executando: ./alienport $GAMEDIR"
 ulimit -c 0 2>/dev/null || true
-./alienport "$GAMEDIR"
-EXIT_CODE=$?
+./alienport "$GAMEDIR" 2>&1 | tee -a "$GAMEDIR/log.txt"
+EXIT_CODE=${PIPESTATUS[0]}
 
 echo "=============================================="
 echo "Jogo finalizou em $(date) com código: $EXIT_CODE"
@@ -164,17 +164,19 @@ if [ -n "$ESUDO" ]; then
 fi
 
 unset LD_LIBRARY_PATH
-cp -f "$LOG_ROOT" "$GAMEDIR/log.txt" 2>/dev/null || true
+cp -f "$GAMEDIR/log.txt" "$LOG_ROOT" 2>/dev/null || true
+sync
 
 # Se saiu com erro (crash), mostra na tela do console antes de voltar
 if [ $EXIT_CODE -ne 0 ]; then
-  echo "O jogo fechou com erro! Mostrando log na tela por 10 segundos..."
+  echo "O jogo fechou com erro (código: $EXIT_CODE)! Mostrando log na tela por 25 segundos..."
   if [ -w "$CUR_TTY" ]; then
-    tail -n 25 "$LOG_ROOT" > "$CUR_TTY" 2>/dev/null
+    tail -n 25 "$GAMEDIR/log.txt" > "$CUR_TTY" 2>/dev/null
   fi
-  sleep 10
+  sleep 25
 fi
 
+sync
 [ -n "$CUR_TTY" ] && [ -w "$CUR_TTY" ] && printf "\033c" > "$CUR_TTY" 2>/dev/null || true
 printf "\033c" > /dev/tty0 2>/dev/null || true
 exit $EXIT_CODE
