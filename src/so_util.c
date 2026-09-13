@@ -76,7 +76,7 @@ int so_load(const char *filename, void *base, size_t max_size) {
   printf("[so_util] Opening %s\n", filename);
   FILE *fd = fopen(filename, "rb");
   if (!fd) {
-    fprintf(stderr, "[so_util] Failed to open %s\n", filename);
+    fprintf(stderr, "[so_util] Failed to open %s: %s (errno=%d)\n", filename, strerror(errno), errno);
     return -1;
   }
 
@@ -84,28 +84,53 @@ int so_load(const char *filename, void *base, size_t max_size) {
   so_size = ftell(fd);
   fseek(fd, 0, SEEK_SET);
 
+  printf("[so_util] File size: %zu bytes (%.2f MB)\n", so_size, (double)so_size / (1024.0 * 1024.0));
+
+  if (so_size < 64) {
+    fprintf(stderr, "[so_util] Error: File %s is too small or empty (%zu bytes)!\n", filename, so_size);
+    fclose(fd);
+    return -1;
+  }
+
   so_base = malloc(so_size);
   if (!so_base) {
+    fprintf(stderr, "[so_util] Failed to allocate %zu bytes for file buffer: %s\n", so_size, strerror(errno));
     fclose(fd);
     return -2;
   }
 
-  if (fread(so_base, so_size, 1, fd) != 1) {
-    fclose(fd);
-    free(so_base);
-    return -3;
+  size_t read_bytes = 0;
+  while (read_bytes < so_size) {
+    size_t chunk = fread((char *)so_base + read_bytes, 1, so_size - read_bytes, fd);
+    if (chunk == 0) {
+      if (ferror(fd)) {
+        fprintf(stderr, "[so_util] Read error at byte %zu: %s\n", read_bytes, strerror(errno));
+      }
+      break;
+    }
+    read_bytes += chunk;
   }
   fclose(fd);
 
+  if (read_bytes != so_size) {
+    fprintf(stderr, "[so_util] Incomplete read: got %zu of %zu bytes\n", read_bytes, so_size);
+    free(so_base);
+    so_base = NULL;
+    return -3;
+  }
+
   if (memcmp(so_base, ELFMAG, SELFMAG) != 0) {
-    fprintf(stderr, "[so_util] Not a valid ELF file\n");
+    fprintf(stderr, "[so_util] Not a valid ELF file (magic: 0x%02x 0x%02x 0x%02x 0x%02x)\n",
+            ((unsigned char *)so_base)[0], ((unsigned char *)so_base)[1],
+            ((unsigned char *)so_base)[2], ((unsigned char *)so_base)[3]);
     res = -1;
     goto err_free_so;
   }
 
   elf_hdr = (Elf64_Ehdr *)so_base;
   if (elf_hdr->e_ident[EI_CLASS] != ELFCLASS64 || elf_hdr->e_machine != EM_AARCH64) {
-    fprintf(stderr, "[so_util] Not an AArch64 ELF file\n");
+    fprintf(stderr, "[so_util] Not an AArch64 ELF file (class=%d, machine=%d)\n",
+            elf_hdr->e_ident[EI_CLASS], elf_hdr->e_machine);
     res = -1;
     goto err_free_so;
   }
@@ -125,15 +150,27 @@ int so_load(const char *filename, void *base, size_t max_size) {
   }
 
   if (exec_seg < 0) {
+    fprintf(stderr, "[so_util] Error: No executable PT_LOAD segment found in ELF!\n");
     res = -1;
     goto err_free_so;
   }
 
   load_size = ALIGN_MEM(max_end, 0x1000);
+  printf("[so_util] Allocating virtual memory: %zu bytes (%.2f MB)\n",
+         load_size, (double)load_size / (1024.0 * 1024.0));
+
   if (base == NULL) {
+    // Tenta primeiro PROT_READ | PROT_WRITE | PROT_EXEC
     base = mmap(NULL, load_size, PROT_READ | PROT_WRITE | PROT_EXEC,
                 MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
     if (base == MAP_FAILED) {
+      printf("[so_util] mmap with PROT_EXEC failed, falling back to PROT_READ|PROT_WRITE...\n");
+      base = mmap(NULL, load_size, PROT_READ | PROT_WRITE,
+                  MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    }
+    if (base == MAP_FAILED) {
+      fprintf(stderr, "[so_util] mmap failed for size %zu: %s (errno=%d)\n",
+              load_size, strerror(errno), errno);
       res = -4;
       goto err_free_so;
     }
@@ -172,8 +209,10 @@ int so_load(const char *filename, void *base, size_t max_size) {
   return 0;
 
 err_free_so:
-  free(so_base);
-  so_base = NULL;
+  if (so_base) {
+    free(so_base);
+    so_base = NULL;
+  }
   return res;
 }
 
