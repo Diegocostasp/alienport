@@ -14,6 +14,7 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
+#include <signal.h>
 
 static pthread_mutex_t g_lock;
 
@@ -248,6 +249,39 @@ int b_rwlock_unlock(void *rw) {
   return real ? pthread_rwlock_unlock(real) : 0;
 }
 
-int b_pthread_once(pthread_once_t *once_control, void (*init_routine)(void)) {
-  return pthread_once(once_control, init_routine);
+int b_once(void *once_ctl, void (*init)(void)) {
+  if (!once_ctl || !init) return 0;
+  volatile int *st = (volatile int *)once_ctl;
+  pthread_mutex_lock(&g_lock);
+  while (*st == 1) {
+    pthread_mutex_unlock(&g_lock);
+    usleep(200);
+    pthread_mutex_lock(&g_lock);
+  }
+  if (*st == 0) {
+    *st = 1;
+    pthread_mutex_unlock(&g_lock);
+    init();
+    pthread_mutex_lock(&g_lock);
+    *st = 2;
+  }
+  pthread_mutex_unlock(&g_lock);
+  return 0;
 }
+
+int b_pthread_once(pthread_once_t *once_control, void (*init_routine)(void)) {
+  return b_once((void *)once_control, init_routine);
+}
+
+int my_sigaction(int sig, const void *act, void *old) {
+  if (!act) return sigaction(sig, NULL, (struct sigaction *)old);
+  void *h = *(void * const *)act; /* sa_handler / sa_sigaction @ offset 0 */
+  struct sigaction g;
+  memset(&g, 0, sizeof(g));
+  g.sa_sigaction = (void (*)(int, siginfo_t *, void *))h;
+  sigemptyset(&g.sa_mask);
+  g.sa_flags = SA_SIGINFO | SA_RESTART;
+  int rr = sigaction(sig, &g, (struct sigaction *)old);
+  return rr < 0 ? 0 : rr;
+}
+

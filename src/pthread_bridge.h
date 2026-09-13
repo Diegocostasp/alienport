@@ -38,6 +38,9 @@ int b_rwlock_wrlock(void *rw);
 int b_rwlock_unlock(void *rw);
 
 int b_pthread_once(pthread_once_t *once_control, void (*init_routine)(void));
+int b_once(void *once_control, void (*init_routine)(void));
+
+int my_sigaction(int sig, const void *act, void *old);
 
 #ifdef __cplusplus
 }
