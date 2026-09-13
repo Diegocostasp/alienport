@@ -1,5 +1,6 @@
 #include "jni_shim.h"
 #include "asset_shim.h"
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

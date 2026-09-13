@@ -120,12 +120,12 @@ int main(int argc, char *argv[]) {
     char test_path[PATH_MAX];
     snprintf(test_path, sizeof(test_path), "%s/%s", gamedir, candidate_paths[i]);
     if (access(test_path, F_OK) == 0) {
-      strncpy(so_path, test_path, sizeof(so_path) - 1);
+      snprintf(so_path, sizeof(so_path), "%s", test_path);
       found_so = 1;
       break;
     }
     if (access(candidate_paths[i], F_OK) == 0) {
-      strncpy(so_path, candidate_paths[i], sizeof(so_path) - 1);
+      snprintf(so_path, sizeof(so_path), "%s", candidate_paths[i]);
       found_so = 1;
       break;
     }
