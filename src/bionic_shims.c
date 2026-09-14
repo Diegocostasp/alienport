@@ -154,6 +154,35 @@ int __android_log_print(int prio, const char *tag, const char *fmt, ...) {
   return 0;
 }
 
+void bionic_abort(void) {
+  void *caller = __builtin_return_address(0);
+  uintptr_t lr = (uintptr_t)caller;
+  fprintf(stderr, "\n==================== ABORT() INTERCEPTADO ====================\n");
+  fprintf(stderr, "[bionic] abort() chamado por: %p", caller);
+  if (load_base && lr >= (uintptr_t)load_base && lr < (uintptr_t)load_base + load_size) {
+    fprintf(stderr, " (libalien_shooter.so offset: +0x%lx)\n", (unsigned long)(lr - (uintptr_t)load_base));
+  } else {
+    fprintf(stderr, "\n");
+  }
+
+  uintptr_t fp = (uintptr_t)__builtin_frame_address(0);
+  fprintf(stderr, "[bionic] Call stack unwind (frame pointer chain):\n");
+  for (int i = 0; i < 24 && fp && (fp & 7) == 0; i++) {
+    uintptr_t next_fp = *(uintptr_t *)fp;
+    uintptr_t ret = *(uintptr_t *)(fp + 8);
+    fprintf(stderr, "  #%02d fp=%p lr=%p", i, (void *)fp, (void *)ret);
+    if (load_base && ret >= (uintptr_t)load_base && ret < (uintptr_t)load_base + load_size) {
+      fprintf(stderr, " (libalien_shooter.so +0x%lx)", (unsigned long)(ret - (uintptr_t)load_base));
+    }
+    fprintf(stderr, "\n");
+    if (next_fp <= fp || (next_fp - fp) > 0x200000) break;
+    fp = next_fp;
+  }
+  fprintf(stderr, "==============================================================\n");
+  fflush(stderr);
+  _exit(134);
+}
+
 int __android_log_write(int prio, const char *tag, const char *text) {
   fprintf(stderr, "[%c/%s] %s\n", lvl[(prio >= 0 && prio < 8) ? prio : 0], tag ? tag : "?", text ? text : "");
   return 0;

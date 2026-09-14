@@ -447,27 +447,19 @@ int main(int argc, char *argv[]) {
 
   printf("[main] === BundleManager/PlayCore bypass completo! ===\n");
 
-  /* Patch: Neutraliza a checagem do canário de stack do GameThread::handleEvents.
-   * Devido à transição entre threads glibc e convenções Android NDK no ARM64,
-   * o frame canary do handleEvents gerava falso positivo e abortava com código 134.
-   * Substituímos os saltos condicionais b.ne __stack_chk_fail por NOP. */
-  uintptr_t handle_events = so_find_addr("_ZN7android10GameThread12handleEventsEb");
-  if (handle_events) {
-    so_make_text_writable();
-    uint32_t *chk1 = (uint32_t *)(handle_events + 0x410);
-    uint32_t *chk2 = (uint32_t *)(handle_events + 0x470);
-    if (*chk1 == 0x54000361) {
-      *chk1 = 0xd503201f; // NOP
-      printf("[main] Patched GameThread::handleEvents stack canary check #1 (0x%lx) -> NOP\n",
-             (unsigned long)(handle_events + 0x410 - (uintptr_t)text_base));
-    }
-    if (*chk2 == 0x54000061) {
-      *chk2 = 0xd503201f; // NOP
-      printf("[main] Patched GameThread::handleEvents stack canary check #2 (0x%lx) -> NOP\n",
-             (unsigned long)(handle_events + 0x470 - (uintptr_t)text_base));
-    }
-    so_make_text_executable();
-    so_flush_caches();
+  /* Patch Universal: Neutraliza globalmente todas as checagens de stack canary
+   * (b.ne __stack_chk_fail) no binário libalien_shooter.so.
+   * No ARM64, o binário do Android NDK lê o canário de [tpidr_el0 + 0x28]. No Linux
+   * com glibc, esse slot TLS é modificado pelo kernel/glibc (gerando falsos positivos
+   * e aborts SIGABRT em múltiplas funções como handleEvents, initDisplay, etc).
+   * A função so_patch_stack_canaries() substitui todos os saltos condicionais para NOP,
+   * permitindo que todas as funções executem seus epílogos normais. */
+  const char *env_canary = getenv("PATCH_CANARY");
+  if (!env_canary || strcmp(env_canary, "0") != 0) {
+    printf("[main] PATCH_CANARY=1 (ativo). Aplicando patch universal de stack canaries...\n");
+    so_patch_stack_canaries();
+  } else {
+    printf("[main] PATCH_CANARY=0 detectado. Patch universal de canaries DESATIVADO.\n");
   }
 
   /* 5. Executa construtores (.init_array) */

@@ -34,6 +34,7 @@ int __android_log_vprint(int prio, const char *tag, const char *fmt, va_list ap)
 
 void __stack_chk_fail(void);
 void bionic_stack_chk_fail(void);
+void bionic_abort(void);
 
 /* Android FORTIFY Shims */
 void *bionic_memcpy_chk(void *dest, const void *src, size_t len, size_t destlen);

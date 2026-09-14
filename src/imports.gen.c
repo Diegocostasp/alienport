@@ -125,7 +125,7 @@ DynLibFunction dynlib_functions[] = {
   {"__vsnprintf_chk", (uintptr_t)bionic_vsnprintf_chk},
   {"__vsprintf_chk", (uintptr_t)bionic_vsprintf_chk},
   {"__write_chk", (uintptr_t)bionic_write_chk},
-  {"abort", (uintptr_t)abort},
+  {"abort", (uintptr_t)bionic_abort},
   {"accept", (uintptr_t)accept},
   {"accept4", (uintptr_t)accept4},
   {"access", (uintptr_t)access},
