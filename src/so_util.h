@@ -40,6 +40,7 @@ uintptr_t so_find_rel_addr_safe(const char *symbol);
 DynLibFunction *so_find_import(DynLibFunction *funcs, int num_funcs,
                                const char *name);
 void so_finalize(void);
+int so_patch_stack_canaries(void);
 int so_unload(void);
 
 #endif

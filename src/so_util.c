@@ -362,3 +362,76 @@ uintptr_t so_find_rel_addr_safe(const char *symbol) {
 void so_finalize(void) {
   mprotect(text_virtbase, ALIGN_MEM(text_size, 0x1000), PROT_READ | PROT_EXEC);
 }
+
+int so_patch_stack_canaries(void) {
+  if (!text_virtbase || text_size < 16) return 0;
+
+  uint32_t *instructions = (uint32_t *)text_virtbase;
+  size_t num_words = text_size / sizeof(uint32_t);
+
+  /* Endereço PLT de __stack_chk_fail no ELF */
+  uintptr_t plt_fail = (uintptr_t)load_base + 0x00d7f730;
+
+  /* Bitmap: 1 bit por instrução de 32 bits para marcação rápida dos fail sites */
+  size_t bitmap_size = (num_words + 7) / 8;
+  uint8_t *fail_bitmap = (uint8_t *)calloc(bitmap_size, 1);
+  if (!fail_bitmap) {
+    fprintf(stderr, "[so_util] Erro ao alocar bitmap para patch de canários\n");
+    return -1;
+  }
+
+  int fail_sites_count = 0;
+  for (size_t i = 0; i < num_words; i++) {
+    uint32_t val = instructions[i];
+    if ((val & 0xfc000000u) == 0x94000000u) { // BL
+      int32_t imm26 = (int32_t)(val & 0x03ffffffu);
+      if (imm26 & 0x02000000) imm26 -= 0x04000000;
+      uintptr_t dest = (uintptr_t)&instructions[i] + ((uintptr_t)imm26 * 4);
+      if (dest == plt_fail) {
+        fail_bitmap[i / 8] |= (1 << (i % 8));
+        fail_sites_count++;
+      }
+    }
+  }
+
+  printf("[so_util] Coletados %d call sites de __stack_chk_fail\n", fail_sites_count);
+
+  so_make_text_writable();
+  int patched_count = 0;
+
+  for (size_t i = 0; i < num_words; i++) {
+    uint32_t val = instructions[i];
+    int is_jump = 0;
+    int32_t imm = 0;
+
+    // B.cond (0x54000000)
+    if ((val & 0xff000010u) == 0x54000000u) {
+      imm = (int32_t)((val >> 5) & 0x7ffffu);
+      if (imm & 0x40000) imm -= 0x80000;
+      is_jump = 1;
+    }
+    // CBZ / CBNZ (0x34000000 / 0x35000000)
+    else if ((val & 0x7e000000u) == 0x34000000u) {
+      imm = (int32_t)((val >> 5) & 0x7ffffu);
+      if (imm & 0x40000) imm -= 0x80000;
+      is_jump = 1;
+    }
+
+    if (is_jump) {
+      int64_t target_idx = (int64_t)i + imm;
+      if (target_idx >= 0 && (size_t)target_idx < num_words) {
+        if (fail_bitmap[target_idx / 8] & (1 << (target_idx % 8))) {
+          instructions[i] = 0xd503201fu; // NOP
+          patched_count++;
+        }
+      }
+    }
+  }
+
+  free(fail_bitmap);
+  so_make_text_executable();
+  so_flush_caches();
+
+  printf("[so_util] Neutralizados globalmente %d saltos de stack canary para NOP!\n", patched_count);
+  return patched_count;
+}
