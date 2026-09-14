@@ -133,6 +133,7 @@ fi
 mkdir -p "$GAMEDIR/savedata"
 export LD_LIBRARY_PATH="$GAMEDIR/lib:$GAMEDIR:$LD_LIBRARY_PATH"
 export MALLOC_CHECK_=0
+export PATCH_CANARY=1 # 1 = Ativa patch global de canaries, 0 = Desativa
 [ -n "$sdl_controllerconfig" ] && export SDL_GAMECONTROLLERCONFIG="$sdl_controllerconfig"
 
 # Teste de dependências (ldd)
